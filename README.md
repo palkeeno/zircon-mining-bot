@@ -1,11 +1,28 @@
-# Zircon Tools - Discord Bot
+# Zircon Mining Bot - Discord Bot
 
 Discord サーバー用の採掘ゲームボットです。ユーザーは国に所属してジルコンを採掘し、ランキングを競うことができます。
+
+## リポジトリ名と配置先
+
+リポジトリは `palkeeno/zircon-mining-bot` です。
+
+```bash
+git clone https://github.com/palkeeno/zircon-mining-bot.git
+cd zircon-mining-bot
+```
+
+既存チェックアウトでは、取得先を更新します。
+
+```bash
+git remote set-url origin https://github.com/palkeeno/zircon-mining-bot.git
+```
+
+リポジトリ名と本番の配置先は別です。既存の `/home/zircon-mining`、cron、DB、環境設定はそのまま使用します。起動ファイルは引き続き `zrmine.py` です。配置先を変更する場合は、Botを停止したうえで `CWD`、DB・画像のパス、cronやサービスのパス、仮想環境を確認してください。
 
 ## プロジェクト構造
 
 ```
-zircon-tools/
+zircon-mining-bot/
 ├── zrmine.py                    # メインエントリーポイント
 ├── config/                      # 設定関連
 │   ├── config.py               # 環境変数・定数設定
@@ -164,7 +181,24 @@ Pythonやログの場所を変更する場合は、`ZIRCON_PYTHON_BIN`、`ZIRCON
 
 ## 開発
 
-### プロジェクト構造の説明
+### リポジトリ名と配置先
+
+リポジトリは `palkeeno/zircon-mining-bot` です。
+
+```bash
+git clone https://github.com/palkeeno/zircon-mining-bot.git
+cd zircon-mining-bot
+```
+
+既存チェックアウトでは、取得先を更新します。
+
+```bash
+git remote set-url origin https://github.com/palkeeno/zircon-mining-bot.git
+```
+
+リポジトリ名と本番の配置先は別です。既存の `/home/zircon-mining`、cron、DB、環境設定はそのまま使用します。起動ファイルは引き続き `zrmine.py` です。配置先を変更する場合は、Botを停止したうえで `CWD`、DB・画像のパス、cronやサービスのパス、仮想環境を確認してください。
+
+## プロジェクト構造の説明
 - **config/**: 設定関連のファイルを集約
 - **utils/**: 汎用ユーティリティとシステム機能
 - **models/**: データベースモデルとデータアクセス層
