@@ -1,4 +1,4 @@
-# Zircon Tools Bot - サーバー管理者向け取扱説明書
+# Zircon Mining Bot - サーバー管理者向け取扱説明書
 
 ## 目次
 
@@ -13,7 +13,7 @@
 
 ## 概要
 
-Zircon Tools Botは、Discordサーバー向けの採掘ゲームボットです。ユーザーは4つの国（Brave、Freedom、Glory、Peaceful）に所属してジルコン（💎）を採掘し、個人・国別のランキングを競うことができます。
+Zircon Mining Botは、Discordサーバー向けの採掘ゲームボットです。ユーザーは4つの国（Brave、Freedom、Glory、Peaceful）に所属してジルコン（💎）を採掘し、個人・国別のランキングを競うことができます。
 
 ### 主な機能
 
