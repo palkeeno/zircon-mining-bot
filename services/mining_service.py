@@ -1,18 +1,18 @@
 import asyncio
 import random
+from pathlib import Path
 import discord
-from utils.helpers import get_country, gacha, has_mining_role, get_mining_image_count
-from models import mining, users
+from utils.helpers import get_country, gacha, has_mining_role
+from models import wallet
 import config.config as config
 from config.role_manager import RoleProbabilityManager
 from consts import sysmsg as SysMsg
-from consts import const
 from services.embeds import mining_performance, mining as mining_embed, excellent
 
 
 def get_excellent_channel_id(country):
     """Excellent通知先を返す。国未所属者は共通雑談チャンネルに送る。"""
-    return country["chid"] if country is not None else config.MINING_EXCELLENT_CHAT
+    return country["chid"] if country is not None else config.get_excellent_chat()
 
 
 async def get_channel(client, channel_id):
@@ -25,15 +25,15 @@ async def get_channel(client, channel_id):
     return channel
 
 
-async def send_excellent_notification(client, user, country):
+async def send_excellent_notification(client, user, country, filename):
     """Excellent結果を国別、または国未所属者用の雑談チャンネルへ送る。"""
     channel_id = get_excellent_channel_id(country)
     channel = await get_channel(client, channel_id)
     img_ex = discord.File(
-        fp=f"{config.CWD}/assets/{const.EX_CELEB}",
-        filename=const.EX_CELEB,
+        fp=f"{config.CWD}/assets/{filename}",
+        filename=filename,
     )
-    await channel.send(file=img_ex, embed=excellent(user))
+    await channel.send(file=img_ex, embed=excellent(user, filename))
 
 
 async def send_mining_error(interaction):
@@ -47,6 +47,7 @@ async def send_mining_error(interaction):
 
 async def mining_zircon(interaction: discord.Interaction, client):
     """ジルコン採掘アクション"""
+    credited = False
     try:
         if not config.get_mine_open():
             await interaction.response.send_message(
@@ -60,16 +61,6 @@ async def mining_zircon(interaction: discord.Interaction, client):
             )
             return
         country = get_country(interaction.user)
-        roleid = country["role"] if country is not None else 0
-        # DBのレコードを見て採掘済みかチェック
-        ures = await mining.get_user_single(interaction.user.id, roleid)
-        if ures is not None:
-            if bool(ures[6]):  # ures[6]=done_flag
-                await interaction.response.send_message(
-                    content=SysMsg.get_once_mining_message(), ephemeral=True
-                )
-                return
-        
         # ロール別確率を取得
         role_manager = RoleProbabilityManager()
         user_probability = role_manager.get_user_probability(interaction.user, config.get_probability())
@@ -78,48 +69,45 @@ async def mining_zircon(interaction: discord.Interaction, client):
         result = gacha(random.random(), user_probability)
         # 採掘結果がエクセレントかどうか判定
         isExcellent = result["id"] == 0
-        # 採掘結果をDBに保存して、メッセージを送信
-        await mining.upsert(interaction.user.id, roleid, result["zirnum"], isExcellent)
-        await users.upsert(interaction.user.id, result["zirnum"], isExcellent)
-
         await interaction.response.defer(thinking=True, ephemeral=True)
+        assets = Path(config.CWD) / "assets"
+        gifs = sorted(assets.glob("mining[0-9]*.gif"))
+        images = sorted(assets.glob(f"{result['msg']}[0-9]*.png"))
+        if not gifs or not images:
+            raise FileNotFoundError("採掘画像がありません。")
+        fn_gif = random.choice(gifs).name
+        fn_img = random.choice(images).name
+        try:
+            total = wallet.claim(interaction.user.id, result["zirnum"], isExcellent, interaction.id)
+            credited = True
+        except ValueError as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+            return
 
-        # ガチャ演出のランダム化 random_performance_key, performance_num
-        rpk = random.randint(1,100)
-        # 演出GIFファイルの枚数を動的に取得
-        gif_count = get_mining_image_count("mining", ".gif")
-        if gif_count == 0:
-            # GIFが見つからない場合はデフォルト値を使用
-            gif_count = 1
-        pn_gif = int(rpk % gif_count)
-        # ガチャ演出の表示
-        fn_gif=f"mining{pn_gif}.gif"
         gif_mining = discord.File(
-            fp=f"./assets/{fn_gif}",
+            fp=f"{config.CWD}/assets/{fn_gif}",
             filename=fn_gif
         )
         em1 = mining_performance(interaction.user, fn_gif)
         mining_msg = await interaction.followup.send(embed=em1, file=gif_mining, ephemeral=True)
         await asyncio.sleep(3)
 
-        # ガチャ結果タイプに対応する画像ファイルの枚数を動的に取得
-        image_count = get_mining_image_count(result["msg"])
-        if image_count == 0:
-            # 画像が見つからない場合はデフォルト値を使用
-            image_count = 1
-        pn_img = int(rpk % image_count)
-        fn_img = f"{result['msg']}{pn_img}.png"
         img_mresult = discord.File(
             fp=f"{config.CWD}/assets/{fn_img}",
             filename=fn_img,
         )
-        total = (ures[3] if ures is not None else 0) + result["zirnum"]
         em2 = mining_embed(result, interaction.user, total, fn_img)
-        await mining_msg.delete()
-        await interaction.followup.send(embed=em2, file=img_mresult, ephemeral=True)
+        await mining_msg.edit(embed=em2, attachments=[img_mresult])
         # 採掘結果が「Excellent!!」の場合、各国雑談チャンネルに投稿する
         if isExcellent:
-            await send_excellent_notification(client, interaction.user, country)
+            try:
+                await send_excellent_notification(client, interaction.user, country, fn_img)
+            except Exception as error:
+                print(f"Excellent通知エラー: {error}")
+                await interaction.followup.send("採掘・残高更新は完了しましたが、Excellent通知を送信できませんでした。", ephemeral=True)
     except Exception as e:
         print(f"採掘処理エラー ({type(e).__name__}): {e}")
-        await send_mining_error(interaction)
+        if credited:
+            await interaction.followup.send("採掘・残高更新は完了しています。画像表示に失敗したため、保有数ボタンで確認してください。", ephemeral=True)
+        else:
+            await send_mining_error(interaction)

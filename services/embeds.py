@@ -23,7 +23,7 @@ def mining(result, user, total, filename):
         embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
         embed.add_field(
             name=f":pick: :sparkles: {result['msg']}! **{result['zirnum']}** :gem: 掘れた！",
-            value=f"これまでの採掘数 **{total}** :gem:",
+            value=f"現在の保有数 **{total}** :gem:",
             inline=False,
         )
         embed.set_image(url=f"attachment://{filename}")
@@ -46,13 +46,13 @@ def mining_performance(user, filename):
 
 
 # 採掘結果Excellentを雑談チャネルに投稿するときのembed
-def excellent(user):
+def excellent(user, filename):
     try:
         embed = discord.Embed(
             title="Excellent採掘しました！ :gem::gem::gem:", description="", color=0x00FF00
         )
         embed.set_author(name=user.display_name, icon_url=user.display_avatar.url)
-        embed.set_thumbnail(url="attachment://ex_celebrate.png")
+        embed.set_thumbnail(url=f"attachment://{filename}")
         return embed
     except Exception as e:
         handle_embed_error(e, "excellent")

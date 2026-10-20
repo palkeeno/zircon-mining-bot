@@ -100,6 +100,7 @@ class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
                 client,
                 user=object(),
                 country=None,
+                filename="Excellent2.png",
             )
 
         client.get_channel.assert_called_once_with(456)
