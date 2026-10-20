@@ -1,5 +1,6 @@
 import os
-import shutil
+import sqlite3
+from contextlib import closing
 import datetime
 from typing import List
 import config.config as config
@@ -15,14 +16,15 @@ def create_backup() -> List[str]:
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
-    timestamp = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S_%f")
     backup_files = []
 
     # 各データベースファイルのバックアップを作成
     for db_path in [config.DB_MINING, config.DB_USERS]:
         if os.path.exists(db_path):
             backup_path = os.path.join(backup_dir, f"{os.path.basename(db_path)}_{timestamp}")
-            shutil.copy2(db_path, backup_path)
+            with closing(sqlite3.connect(db_path)) as source, closing(sqlite3.connect(backup_path)) as destination:
+                source.backup(destination)
             backup_files.append(backup_path)
 
     return backup_files

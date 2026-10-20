@@ -64,7 +64,7 @@ def has_mining_role(user):
         if user is None:
             return False
         for usr_role in user.roles:
-            if usr_role.id == config.MINING_ROLE:
+            if usr_role.id == config.get_mining_role():
                 return True
         return False
     except Exception as e:

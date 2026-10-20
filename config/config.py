@@ -12,10 +12,10 @@ ENV_FILE = ".env.production" if ENV == "production" else ".env.development"
 load_dotenv(PROJECT_ROOT / ENV_FILE)
 
 # 設定マネージャーのインポート
-from config.settings_manager import SettingsManager
+from config.settings_manager import settings_manager
 
 # 設定マネージャーのインスタンスを作成
-settings = SettingsManager()
+settings = settings_manager
 
 #### Load Env (Sensitive Information) ####
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -41,6 +41,19 @@ GLORY_ROLE = int(os.getenv("GLORY_ROLE"))
 PEACEFUL_ROLE = int(os.getenv("PEACEFUL_ROLE"))
 # 採掘ロール
 MINING_ROLE = int(os.getenv("MINING_ROLE"))
+TREASURY_USER_ID = int(os.getenv("TREASURY_USER_ID", "0"))
+
+
+def get_mining_role():
+    return int(settings.get("mining_role", MINING_ROLE))
+
+
+def get_treasury_user_id():
+    return int(settings.get("treasury_user_id", TREASURY_USER_ID))
+
+
+def get_excellent_chat():
+    return int(settings.get("excellent_chat", MINING_EXCELLENT_CHAT))
 
 # Emojis
 BRAVE_EMOJI = os.getenv("BRAVE_EMOJI")
