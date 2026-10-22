@@ -4,7 +4,7 @@ import unittest
 import discord
 import test_mining_service
 from views.wallet_view import RankingView, MiningView, WalletView, ensure_panels
-from views.settings_view import SettingsView, ScheduleModal, TargetView
+from views.settings_view import SettingsView, ScheduleModal, TargetView, TreasuryView
 from services import mining_service
 import zrmine
 
@@ -13,7 +13,7 @@ def interaction(admin=False):
     return SimpleNamespace(
         id=12345, guild=SimpleNamespace(id=789, get_member=Mock(return_value=None)),
         client=SimpleNamespace(mining_guild_id=789),
-        user=SimpleNamespace(id=100, guild_permissions=SimpleNamespace(administrator=admin)),
+        user=SimpleNamespace(id=100, roles=[], guild_permissions=SimpleNamespace(administrator=admin)),
         response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock(), is_done=Mock(return_value=False)),
         followup=SimpleNamespace(send=AsyncMock()),
     )
@@ -125,18 +125,29 @@ class UITests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(command.default_permissions.administrator)
             self.assertFalse(await command.checks[0](interaction(False)))
             self.assertTrue(await command.checks[0](interaction(True)))
-        for component in (SettingsView(), TargetView(), ScheduleModal()):
+        for component in (SettingsView(), TargetView(), TreasuryView(), ScheduleModal()):
             self.assertFalse(await component.interaction_check(interaction(False)))
             self.assertTrue(await component.interaction_check(interaction(True)))
 
     async def test_donation_uses_only_configured_treasury(self):
-        i = interaction()
-        with patch.object(zrmine.config, "get_treasury_user_id", return_value=999), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
-            await zrmine.donate.callback(i, 8)
-        transact.assert_awaited_once_with(i, 8, source=100, target=999, kind="donate")
-        with patch.object(zrmine.config, "get_treasury_user_id", return_value=0), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
-            await zrmine.donate.callback(i, 8)
-        transact.assert_not_awaited()
+        countries = [dict(id=n, role=200 + n, name=f"Country{n}") for n in range(1, 5)]
+        for country in countries:
+            i = interaction()
+            i.user.roles = [SimpleNamespace(id=country['role'])]
+            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", side_effect=lambda n: 900 + n), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
+                await zrmine.donate.callback(i, 8)
+            transact.assert_awaited_once_with(i, 8, source=100, target=900 + country['id'], kind="donate",
+                                             success_message=f"{country['name']}の国庫（<@{900 + country['id']}>）へ 8 💎 寄付しました。")
+
+    async def test_donation_rejects_ambiguous_membership_or_treasuries(self):
+        countries = [dict(id=n, role=200 + n) for n in range(1, 5)]
+        for role_ids, treasury in (([], 999), ([201, 202], 999), ([201], 0), ([201], 999)):
+            i = interaction()
+            i.user.roles = [SimpleNamespace(id=role_id) for role_id in role_ids]
+            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", return_value=treasury), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
+                await zrmine.donate.callback(i, 8)
+            transact.assert_not_awaited()
+            self.assertTrue(i.response.send_message.call_args.kwargs['ephemeral'])
 
     async def test_panels_edit_existing_messages_and_never_repost(self):
         channel = SimpleNamespace(fetch_message=AsyncMock(return_value=SimpleNamespace(edit=AsyncMock())), send=AsyncMock())

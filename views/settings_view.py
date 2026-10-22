@@ -20,12 +20,17 @@ def summary():
     s = config.settings
     s.load_settings()
     times = [f"{h:02}:{m:02}" for h in config.get_announce_hour() for m in config.get_announce_minute()]
+    treasuries = "\n".join(
+        f"{c['name']}（<@&{c['role']}>）の国庫："
+        + (f"<@{config.get_treasury_user_id(c['id'])}>" if config.get_treasury_user_id(c['id']) else "未設定（暫定値0）")
+        for c in config.COUNTRIES
+    )
     return (
         f"**採掘Bot設定**\n営業：{'OPEN' if config.get_mine_open() else 'CLOSE'}\n"
         f"リセット（日本時間）：{', '.join(times[:24])}{' …' if len(times) > 24 else ''}（1日{len(times)}回）\n"
         f"各期間の採掘回数：{s.get('mining_limit', 1)}\n"
         f"採掘ロール：<@&{config.get_mining_role()}>\n"
-        f"国庫：{f'<@{config.get_treasury_user_id()}>' if config.get_treasury_user_id() else '未設定（暫定値0）'}\n"
+        f"{treasuries}\n"
         f"未所属Excellent通知先：<#{config.get_excellent_chat()}>\n"
         f"採掘・ランキング投稿先：<#{config.CHID_MINING}>"
     )
@@ -123,6 +128,30 @@ class RoleProbabilityModal(AdminModal, title="ロール別確率"):
         await interaction.response.send_message("ロール別確率を保存しました。", ephemeral=True)
 
 
+class TreasurySelect(discord.ui.UserSelect):
+    def __init__(self, country):
+        super().__init__(placeholder=f"{country['name']}の国庫アカウント", min_values=1, max_values=1)
+        self.country_id = country['id']
+
+    async def callback(self, interaction):
+        try:
+            config.set_treasury_user_id(self.country_id, self.values[0].id)
+        except ValueError as error:
+            await interaction.response.send_message(str(error), ephemeral=True)
+            return
+        await interaction.response.edit_message(content=summary(), view=TreasuryView())
+
+
+class TreasuryView(SafeView):
+    def __init__(self):
+        super().__init__(timeout=180)
+        for country in config.COUNTRIES:
+            self.add_item(TreasurySelect(country))
+
+    async def interaction_check(self, interaction):
+        return await require_admin(interaction)
+
+
 class TargetView(SafeView):
     def __init__(self):
         super().__init__(timeout=180)
@@ -133,11 +162,6 @@ class TargetView(SafeView):
     @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="採掘を許可するロール", min_values=1, max_values=1)
     async def mining_role(self, interaction, select):
         config.settings.set("mining_role", select.values[0].id)
-        await interaction.response.send_message(summary(), ephemeral=True)
-
-    @discord.ui.select(cls=discord.ui.UserSelect, placeholder="寄付先の国庫アカウント", min_values=1, max_values=1)
-    async def treasury(self, interaction, select):
-        config.settings.set("treasury_user_id", select.values[0].id)
         await interaction.response.send_message(summary(), ephemeral=True)
 
     @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="未所属者のExcellent通知先", min_values=1, max_values=1)
@@ -167,9 +191,13 @@ class SettingsView(SafeView):
     async def schedule(self, interaction, button):
         await interaction.response.send_modal(ScheduleModal())
 
-    @discord.ui.button(label="ロール・寄付先・通知先")
+    @discord.ui.button(label="ロール・通知先")
     async def targets(self, interaction, button):
         await interaction.response.send_message(summary(), view=TargetView(), ephemeral=True)
+
+    @discord.ui.button(label="4か国の国庫")
+    async def treasuries(self, interaction, button):
+        await interaction.response.send_message(summary(), view=TreasuryView(), ephemeral=True)
 
     @discord.ui.button(label="確率・獲得数")
     async def probability(self, interaction, button):

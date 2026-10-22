@@ -11,21 +11,23 @@ Discordで常設の採掘ボタンを押し、個人のログインポイント�
 
 結果はすべてエフェメラル（本人のみ表示）です。ランキングは10件ずつ前後に移動できます。所持数ランキングは現在の残高・名前・所属国の絵文字、Excellentランキングは名前・Excellent回数・採掘回数を表示します。所属国がない場合は「—」、取得できないユーザーはIDを表示します。
 
-採掘権は個人単位です。国別の採掘済みフラグや国別集計は使用せず、国ロール変更で追加採掘はできません。国ロールは所属表示とExcellent通知先の選択にのみ使います（複数ある場合の選択順は従来通り）。Excellent通知には、採掘した本人に表示した結果画像と同じファイルをサムネイルとして添付します。
+採掘権は個人単位です。国別の採掘済みフラグや国別集計は使用せず、国ロール変更で追加採掘はできません。国ロールは所属表示・Excellent通知先・寄付先国庫の判定に使います。Excellent通知の複数国所属時の選択順は従来通りです。通知には、採掘した本人に表示した結果画像と同じファイルをサムネイルとして添付します。
 
 ## コマンド
 
 | コマンド | 権限 | 用途 |
 | --- | --- | --- |
-| `/zmsettings` | Administrator | 設定ビューを開く |
-| `/zmadd user amount` | Administrator | 残高を付与 |
-| `/zmremove user amount` | Administrator | 残高を引き去る |
-| `/zmtransfer source target amount` | Administrator | 任意のユーザー間で転送 |
-| `/zmdonate amount` | 一般ユーザー | 自分から設定済み国庫への寄付 |
+| `/settings` | Administrator | 設定ビューを開く |
+| `/add user amount` | Administrator | 残高を付与 |
+| `/remove user amount` | Administrator | 残高を引き去る |
+| `/transfer source target amount` | Administrator | 任意のユーザー間で転送 |
+| `/donate amount` | 一般ユーザー | 自分の所属国の国庫へ自動で寄付 |
 
 管理チャンネルにいるだけでは管理操作できません。設定ビュー・選択メニュー・入力フォームでも権限を再確認します。すべての操作は採掘チャンネルが属するサーバーに限定します。
 
 設定ビューでは開閉、リセットの時・分、リセット間の採掘回数、採掘可能ロール、寄付先、未所属Excellent通知先、共通確率・獲得数、ロール別確率を確認・変更できます。常設投稿が削除された場合の復旧ボタンもあります。
+
+国庫はBrave / Freedom / Glory / Peacefulの国ロールに1対1で対応する4アカウントです。「4か国の国庫」から国ごとに設定します。同一アカウントの重複登録は拒否します。未所属・複数国所属・所属国の国庫未設定時は寄付できません。寄付時に任意ユーザーや他国の国庫を指定することはできません。
 
 旧設定コマンド（`/zmst`、`/zmtime`、`/zmprob`、`/zmrole` など）は設定ビューへ統合しました。旧イベントDBリセット・国ランキング・任意メッセージ投稿コマンドは新バージョンでは登録しません。
 
@@ -46,7 +48,7 @@ python -m pip install -r requirements.txt
 - `CHID_MINING`：採掘・保有数の常設投稿先
 - `MINING_ROLE`：採掘可能ロールの初期値
 - `MINING_EXCELLENT_CHAT`：未所属者のExcellent通知先初期値
-- `TREASURY_USER_ID`：国庫アカウント初期値。省略時は暫定値 `0`（寄付を無効化）
+- `BRAVE_TREASURY_USER_ID` / `FREEDOM_TREASURY_USER_ID` / `GLORY_TREASURY_USER_ID` / `PEACEFUL_TREASURY_USER_ID`：各国の国庫アカウント初期値。省略時は暫定値 `0`（その国への寄付を無効化）
 - 各国の `*_ROLE` / `*_CHAT` / `*_EMOJI`：所属判定・国別Excellent通知・所属表示
 - `DB_USERS`：個人残高・採掘権・取引履歴DB
 - `DB_MINING`：旧採掘DB。移行時の読み取りとバックアップ用

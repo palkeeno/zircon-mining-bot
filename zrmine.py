@@ -51,7 +51,7 @@ def administrator():
     return app_commands.check(predicate)
 
 
-@tree.command(name="zmsettings", description="採掘Botの設定を確認・変更します")
+@tree.command(name="settings", description="採掘Botの設定を確認・変更します")
 @app_commands.guild_only()
 @app_commands.default_permissions(administrator=True)
 @administrator()
@@ -59,7 +59,7 @@ async def settings(interaction: discord.Interaction):
     await interaction.response.send_message(summary(), view=SettingsView(), ephemeral=True)
 
 
-async def transact(interaction, amount, source=None, target=None, kind="transfer"):
+async def transact(interaction, amount, source=None, target=None, kind="transfer", success_message=None):
     await interaction.response.defer(ephemeral=True)
     try:
         wallet.change(amount, actor=interaction.user.id, request_id=interaction.id,
@@ -67,10 +67,10 @@ async def transact(interaction, amount, source=None, target=None, kind="transfer
     except ValueError as error:
         await interaction.followup.send(str(error), ephemeral=True)
         return
-    await interaction.followup.send(f"{amount:,} 💎 の操作が完了しました。", ephemeral=True)
+    await interaction.followup.send(success_message or f"{amount:,} 💎 の操作が完了しました。", ephemeral=True)
 
 
-@tree.command(name="zmadd", description="指定ユーザーにジルコンを付与します")
+@tree.command(name="add", description="指定ユーザーにジルコンを付与します")
 @app_commands.guild_only()
 @app_commands.default_permissions(administrator=True)
 @administrator()
@@ -78,7 +78,7 @@ async def add(interaction: discord.Interaction, user: discord.Member, amount: ap
     await transact(interaction, amount, target=user.id, kind="grant")
 
 
-@tree.command(name="zmremove", description="指定ユーザーのジルコンを引き去ります")
+@tree.command(name="remove", description="指定ユーザーのジルコンを引き去ります")
 @app_commands.guild_only()
 @app_commands.default_permissions(administrator=True)
 @administrator()
@@ -86,7 +86,7 @@ async def remove(interaction: discord.Interaction, user: discord.Member, amount:
     await transact(interaction, amount, source=user.id, kind="remove")
 
 
-@tree.command(name="zmtransfer", description="ユーザー間でジルコンを転送します（管理者専用）")
+@tree.command(name="transfer", description="ユーザー間でジルコンを転送します（管理者専用）")
 @app_commands.guild_only()
 @app_commands.default_permissions(administrator=True)
 @administrator()
@@ -95,15 +95,25 @@ async def transfer(interaction: discord.Interaction, source: discord.Member, tar
     await transact(interaction, amount, source=source.id, target=target.id)
 
 
-@tree.command(name="zmdonate", description="設定された国庫にジルコンを寄付します")
+@tree.command(name="donate", description="所属国の国庫にジルコンを寄付します")
 @app_commands.guild_only()
 async def donate(interaction: discord.Interaction, amount: app_commands.Range[int, 1, 1000000000]):
     config.settings.load_settings()
-    treasury = config.get_treasury_user_id()
+    roles = {role.id for role in interaction.user.roles}
+    countries = [country for country in config.COUNTRIES if country['role'] in roles]
+    if len(countries) != 1:
+        await interaction.response.send_message("所属国を1つに確定できません。国ロールを確認してください。", ephemeral=True)
+        return
+    country = countries[0]
+    treasury = config.get_treasury_user_id(country['id'])
     if not treasury:
         await interaction.response.send_message("寄付先の国庫が未設定です。管理者にお問い合わせください。", ephemeral=True)
         return
-    await transact(interaction, amount, source=interaction.user.id, target=treasury, kind="donate")
+    if any(config.get_treasury_user_id(other['id']) == treasury for other in config.COUNTRIES if other['id'] != country['id']):
+        await interaction.response.send_message("複数国に同じ国庫が設定されています。管理者にお問い合わせください。", ephemeral=True)
+        return
+    await transact(interaction, amount, source=interaction.user.id, target=treasury, kind="donate",
+                   success_message=f"{country['name']}の国庫（<@{treasury}>）へ {amount:,} 💎 寄付しました。")
 
 
 @tree.error
@@ -122,7 +132,7 @@ async def on_ready():
     try:
         await ensure_panels(client)
     except Exception:
-        log.exception("常設投稿の確認に失敗しました。/zmsettings から復旧できます。")
+        log.exception("常設投稿の確認に失敗しました。/settings から復旧できます。")
     if not schedule_backup.is_running():
         schedule_backup.start()
     log.info("Ready")
