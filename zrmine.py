@@ -20,11 +20,18 @@ class MiningClient(discord.Client):
     async def setup_hook(self):
         channel = await self.fetch_channel(config.CHID_MINING)
         self.mining_guild_id = channel.guild.id
+        if config.GUILD_ID and self.mining_guild_id != config.GUILD_ID:
+            raise RuntimeError("CHID_MINING is outside the configured GUILD_ID")
         create_backup()
         wallet.initialize()
         self.add_view(MiningView())
         self.add_view(WalletView())
-        await tree.sync()
+        if config.GUILD_ID:
+            guild = discord.Object(id=config.GUILD_ID)
+            tree.copy_global_to(guild=guild)
+            await tree.sync(guild=guild)
+        else:
+            await tree.sync()
 
 
 intents = discord.Intents.default()

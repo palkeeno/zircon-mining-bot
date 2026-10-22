@@ -12,7 +12,7 @@ def create_backup() -> List[str]:
     Returns:
         List[str]: バックアップファイルのパスリスト
     """
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
@@ -35,7 +35,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
     Args:
         days_to_keep (int): 保持する日数
     """
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     if not os.path.exists(backup_dir):
         return
 
@@ -52,7 +52,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
 
 def cleanup_excess_backups(max_files: int = 10) -> None:
     """各DBごとにバックアップファイルがmax_files個を超えていたら古いものから削除する"""
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     for db_name in [os.path.basename(config.DB_MINING), os.path.basename(config.DB_USERS)]:
         prefix = db_name + "_"
         db_backups = [f for f in os.listdir(backup_dir) if f.startswith(prefix)]

@@ -42,6 +42,8 @@ PEACEFUL_ROLE = int(os.getenv("PEACEFUL_ROLE"))
 # 採掘ロール
 MINING_ROLE = int(os.getenv("MINING_ROLE"))
 TREASURY_USER_ID = int(os.getenv("TREASURY_USER_ID", "0"))
+GUILD_ID = int(os.getenv("GUILD_ID", "0"))
+BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
 
 
 def get_mining_role():

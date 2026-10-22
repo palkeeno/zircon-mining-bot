@@ -51,8 +51,12 @@ python -m pip install -r requirements.txt
 - `DB_USERS`：個人残高・採掘権・取引履歴DB
 - `DB_MINING`：旧採掘DB。移行時の読み取りとバックアップ用
 - `CWD`：既存のアプリ配置先
+- `GUILD_ID`：指定時はこのサーバーだけにコマンドを同期し、採掘チャンネルの所属を検証。省略・0は従来のグローバル同期
+- `SETTINGS_FILE` / `ROLE_SETTINGS_FILE` / `BACKUP_DIR`：環境別の設定・ロール確率・バックアップ保存先
 
 設定ビューで保存した値は `data/user_setting.json` に永続化され、環境変数の初期値より優先します。ロール別確率は既存の `data/role_probabilities.json` を使います。
+
+テスト環境ではDB2種と上記3つの保存先をすべて分離してください。`GUILD_ID` を設定した起動では既存グローバルコマンドを変更・削除しません。過去のグローバル登録が残るテストBotでは候補が重複する場合があります。
 
 Developer Portalの **Server Members Intent** を有効にしてください。Botには投稿先の閲覧・履歴閲覧・メッセージ送信・埋め込み・ファイル添付権限が必要です。
 

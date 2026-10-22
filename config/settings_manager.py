@@ -7,7 +7,7 @@ class SettingsManager:
     """設定値を管理するクラス"""
     
     def __init__(self, settings_file=None):
-        self.settings_file = str(settings_file or Path(__file__).resolve().parent.parent / "data/user_setting.json")
+        self.settings_file = str(settings_file or os.getenv("SETTINGS_FILE") or Path(__file__).resolve().parent.parent / "data/user_setting.json")
         self._settings = {}
         self.load_settings()
     
