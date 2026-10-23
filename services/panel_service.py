@@ -4,6 +4,7 @@ from contextlib import closing
 from pathlib import Path
 
 import discord
+import emoji
 
 import config.config as config
 from consts.characters import get_random_character
@@ -16,7 +17,7 @@ panel_lock = asyncio.Lock()
 
 def character_embed(character):
     filename = f"{character['id']}.png"
-    embed = discord.Embed(description=character['messages'])
+    embed = discord.Embed(description=emoji.emojize(character['messages'], language='alias'))
     embed.set_author(name=character['name'], icon_url=f"attachment://{filename}")
     embed.set_thumbnail(url=f"attachment://{filename}")
     return embed, Path(config.CWD) / 'assets_character' / filename

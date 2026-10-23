@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import discord
+import emoji
 import test_mining_service
 from config.settings_manager import SettingsManager
 from consts.characters import CHARACTERS_LIST, get_random_character
@@ -69,6 +70,6 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
         character = get_random_character()
         embed, path = panels.character_embed(character)
         self.assertEqual(embed.author.name, character['name'])
-        self.assertEqual(embed.description, character['messages'])
+        self.assertEqual(embed.description, emoji.emojize(character['messages'], language='alias'))
         self.assertEqual(embed.author.icon_url, embed.thumbnail.url)
         self.assertEqual(embed.thumbnail.url, f'attachment://{path.name}')
