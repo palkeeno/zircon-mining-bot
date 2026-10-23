@@ -1,5 +1,6 @@
 import os
-from contextlib import closing
+import io
+from contextlib import closing, redirect_stdout
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -15,6 +16,22 @@ import zrmine
 
 
 class EnvironmentTests(unittest.TestCase):
+    def test_backup_cleanup_ignores_old_database_and_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('wallet.db_20200101', 'mining.db_20200101', 'notes.txt'):
+                (root / name).write_text('keep unless wallet backup')
+            with patch.object(backup.config, 'DB_WALLET', 'wallet.db'), \
+                 patch.object(backup.config, 'BACKUP_DIR', str(root)), \
+                 patch.object(backup.os.path, 'getctime', return_value=0):
+                # Windows CI uses a Western code page: cleanup must not depend on Japanese stdout.
+                with io.TextIOWrapper(io.BytesIO(), encoding='cp1252') as output, redirect_stdout(output):
+                    backup.cleanup_old_backups()
+                    backup.cleanup_excess_backups(0)
+            self.assertFalse((root / 'wallet.db_20200101').exists())
+            self.assertTrue((root / 'mining.db_20200101').exists())
+            self.assertTrue((root / 'notes.txt').exists())
+
     def test_settings_and_role_writes_are_isolated(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -39,8 +56,7 @@ class EnvironmentTests(unittest.TestCase):
             with closing(sqlite3.connect(database)) as connection, connection:
                 connection.execute('CREATE TABLE evidence(value INTEGER)')
                 connection.execute('INSERT INTO evidence VALUES(42)')
-            with patch.object(backup.config, 'DB_USERS', str(database)), \
-                 patch.object(backup.config, 'DB_MINING', str(root / 'absent.db')), \
+            with patch.object(backup.config, 'DB_WALLET', str(database)), \
                  patch.object(backup.config, 'BACKUP_DIR', str(root / 'backups')):
                 files = backup.perform_backup()
             self.assertEqual(len(files), 1)
@@ -50,7 +66,7 @@ class EnvironmentTests(unittest.TestCase):
 
 
 class GuildStartupTests(unittest.IsolatedAsyncioTestCase):
-    async def test_wrong_guild_stops_before_backup_migration_or_sync(self):
+    async def test_wrong_guild_stops_before_backup_initialization_or_sync(self):
         client = SimpleNamespace(fetch_channel=AsyncMock(return_value=SimpleNamespace(guild=SimpleNamespace(id=222))))
         with patch.object(zrmine.config, 'GUILD_ID', 111), \
              patch.object(zrmine, 'create_backup') as backup_mock, \

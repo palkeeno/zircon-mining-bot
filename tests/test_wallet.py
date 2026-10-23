@@ -19,8 +19,7 @@ class WalletTests(unittest.TestCase):
         settings = SettingsManager(Path(self.temp.name) / "settings.json")
         settings.update({"announce_hour": [0, 12], "announce_minute": [0], "mining_limit": 1})
         for key, value in {
-            "DB_USERS": str(Path(self.temp.name) / "users.db"),
-            "DB_MINING": str(Path(self.temp.name) / "mining.db"),
+            "DB_WALLET": str(Path(self.temp.name) / "users.db"),
             "settings": settings,
         }.items():
             p = patch.object(wallet.config, key, value)
@@ -36,27 +35,73 @@ class WalletTests(unittest.TestCase):
         wallet.claim(100, 10, True, "mine", self.now)
         self.grant()
         wallet.change(7, actor=999, request_id="transfer", source=100, target=200)
-        wallet.change(3, actor=999, request_id="remove", source=200)
+        wallet.change(3, actor=999, request_id="remove", source=200, kind="remove")
         self.assertEqual(wallet.balance(100), (23, 1, 1))
         self.assertEqual(wallet.balance(200), (4, 0, 0))
-        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db, db:
-            self.assertEqual(db.execute("SELECT lt_total FROM USERS WHERE userid=100").fetchone()[0], 10)
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM LEDGER").fetchone()[0], 4)
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db, db:
+            self.assertEqual(db.execute("SELECT total_mined FROM wallets WHERE user_id=100").fetchone()[0], 10)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM wallet_ledger").fetchone()[0], 4)
 
     def test_insufficient_funds_rolls_back_entire_transfer(self):
         self.grant()
         with self.assertRaises(ValueError):
             wallet.change(21, actor=100, request_id="bad", source=100, target=200)
         self.assertEqual(wallet.balance(100)[0], 20)
-        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db, db:
-            self.assertIsNone(db.execute("SELECT 1 FROM USERS WHERE userid=200").fetchone())
-            self.assertIsNone(db.execute("SELECT 1 FROM LEDGER WHERE request_id='bad'").fetchone())
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db, db:
+            self.assertIsNone(db.execute("SELECT 1 FROM wallets WHERE user_id=200").fetchone())
+            self.assertIsNone(db.execute("SELECT 1 FROM wallet_ledger WHERE request_id='bad'").fetchone())
 
     def test_duplicate_request_is_not_applied_twice(self):
         self.grant()
         with self.assertRaises(ValueError):
             self.grant()
         self.assertEqual(wallet.balance(100)[0], 20)
+
+    def test_all_balance_changes_update_timestamps_but_only_mining_increases_total_mined(self):
+        operations = [
+            lambda: self.grant(),
+            lambda: wallet.claim(100, 10, True, 'mine', self.now),
+            lambda: wallet.change(2, actor=999, request_id='transfer', source=100, target=200),
+            lambda: wallet.change(1, actor=100, request_id='donate', source=100, target=200, kind='donate'),
+            lambda: wallet.change(1, actor=999, request_id='remove', source=200, kind='remove'),
+        ]
+        for index, operation in enumerate(operations):
+            timestamp = self.now.replace(minute=index)
+            with patch.object(wallet, 'datetime', wraps=datetime) as clock:
+                clock.now.return_value = timestamp
+                operation()
+            with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+                source, target, recorded = db.execute(
+                    'SELECT source_id,target_id,created_at FROM wallet_ledger ORDER BY rowid DESC LIMIT 1').fetchone()
+                for uid in (source, target):
+                    if uid is not None:
+                        self.assertEqual(db.execute('SELECT updated_at FROM wallets WHERE user_id=?', (uid,)).fetchone()[0], recorded)
+                self.assertEqual(recorded, timestamp.isoformat())
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+            self.assertEqual(db.execute('SELECT total_mined FROM wallets ORDER BY user_id').fetchall(), [(10,), (0,)])
+
+    def test_duplicate_mining_request_rolls_back_quota_and_credit(self):
+        wallet.config.settings.set('mining_limit', 2)
+        wallet.claim(100, 1, False, 'same', self.now)
+        with self.assertRaisesRegex(ValueError, '処理済み'):
+            wallet.claim(100, 1, False, 'same', self.now)
+        wallet.claim(100, 1, False, 'second', self.now)
+        self.assertEqual(wallet.balance(100), (2, 2, 0))
+
+    def test_new_schema_has_no_reserved_country_user_ids(self):
+        self.grant(uid=1)
+        self.assertEqual(wallet.ranking('balance'), [(1, 20, 0, 0)])
+
+    def test_total_mined_overflow_rolls_back_claim_and_balance(self):
+        self.grant()
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db, db:
+            db.execute('UPDATE wallets SET total_mined=? WHERE user_id=100', (wallet.MAX_AMOUNT,))
+        with self.assertRaises(ValueError):
+            wallet.claim(100, 1, False, 'overflow', self.now)
+        self.assertEqual(wallet.balance(100), (20, 0, 0))
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+            self.assertEqual(db.execute('SELECT * FROM mining_claims').fetchall(), [])
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM wallet_ledger').fetchone(), (1,))
 
     def test_invalid_amount_self_transfer_and_overflow(self):
         for amount in (0, -1, 1.5, True, 2**63):
@@ -119,20 +164,6 @@ class WalletTests(unittest.TestCase):
         self.assertEqual([row[0] for row in wallet.ranking("balance")], [100, 300, 200])
         self.assertEqual(wallet.ranking("excellent")[0], (200, 3, 1, 1))
 
-    def test_legacy_migration_preserves_balances_and_personal_claim(self):
-        self.grant()
-        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db, db:
-            db.execute("DELETE FROM WALLET_META")
-        with closing(sqlite3.connect(wallet.config.DB_MINING)) as db, db:
-            db.execute("CREATE TABLE MINING (userid,roleid,done_flag,updated_at)")
-            stamp = self.now.isoformat()
-            db.executemany("INSERT INTO MINING VALUES (?,?,?,?)", [(100, 1, 1, stamp), (100, 2, 1, stamp)])
-        with patch.object(wallet, "period_start", return_value=self.now.replace(hour=0).isoformat()):
-            wallet.initialize()
-            with self.assertRaises(ValueError):
-                wallet.claim(100, 10, False, "new")
-        self.assertEqual(wallet.balance(100), (20, 0, 0))
-
     def test_period_before_first_daily_reset(self):
         wallet.config.settings.update({"announce_hour": [6, 18], "announce_minute": [30]})
         self.assertEqual(wallet.period_start(self.now.replace(hour=1)), "2026-10-19T18:30:00+09:00")
@@ -154,8 +185,8 @@ class WalletTests(unittest.TestCase):
             wallet.claim(100, 1, False, 'still-denied', reset_time)
         wallet.claim(100, 1, False, 'noon', self.now.replace(hour=12))
         self.assertEqual(wallet.balance(100), (12, 3, 1))
-        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db:
-            self.assertEqual(db.execute('SELECT actor FROM RESET_LOG').fetchall(), [(999,)])
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+            self.assertEqual(db.execute('SELECT actor_id FROM mining_resets').fetchall(), [(999,)])
 
     def test_repeated_manual_resets_at_same_time_have_distinct_periods(self):
         first = wallet.reset_claims(actor=999, request_id='reset1', now=self.now)

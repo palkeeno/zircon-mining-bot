@@ -35,7 +35,7 @@ class WalletService:
         return self.repository.reset_claims(actor=actor, request_id=request_id)
 
     def export(self, limit, tables):
-        return package_exports(export_wallet(self.configuration.DB_USERS, tables), limit)
+        return package_exports(export_wallet(self.configuration.DB_WALLET, tables), limit)
 
     def donate(self, *, actor, roles, amount, request_id):
         config = self.configuration

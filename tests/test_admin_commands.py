@@ -42,18 +42,18 @@ class AdminCommandTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(i.response.send_message.call_args.kwargs['ephemeral'])
         self.service.export.assert_not_called()
         self.assertTrue(view.download.disabled)
-        view.choose._values = ['USERS']
+        view.choose._values = ['wallets']
         await view.choose.callback(i)
         self.assertFalse(view.download.disabled)
-        self.service.export.return_value = [('wallet_users.csv', b'userid,balance\r\n100,42\r\n')]
+        self.service.export.return_value = [('wallets.csv', b'user_id,balance\r\n100,42\r\n')]
         captured = []
         async def receive(*args, **kwargs):
             self.assertTrue(kwargs['ephemeral'])
-            self.assertEqual(kwargs['files'][0].filename, 'wallet_users.csv')
+            self.assertEqual(kwargs['files'][0].filename, 'wallets.csv')
             captured.append(kwargs['files'][0].fp.read())
         i.followup.send.side_effect = receive
         await view.download.callback(i)
-        self.service.export.assert_called_once_with(100000, ('USERS',))
+        self.service.export.assert_called_once_with(100000, ('wallets',))
         self.assertEqual(captured, [self.service.export.return_value[0][1]])
         self.assertTrue(i.followup.send.call_args.kwargs['files'][0].fp.closed)
 
@@ -74,11 +74,11 @@ class AdminCommandTests(unittest.IsolatedAsyncioTestCase):
         i.guild.filesize_limit = 100000
         await view.download.callback(i)
         self.service.export.assert_not_called()
-        view.choose._values = ['USERS', 'LEDGER']
+        view.choose._values = ['wallets', 'wallet_ledger']
         await view.choose.callback(i)
-        self.assertEqual([o.value for o in view.choose.options if o.default], ['USERS', 'LEDGER'])
+        self.assertEqual([o.value for o in view.choose.options if o.default], ['wallets', 'wallet_ledger'])
         self.assertTrue(all('.csv' not in o.label for o in view.choose.options))
-        self.service.export.return_value = [('wallet_users.csv', b'users'), ('wallet_ledger.csv', b'ledger')]
+        self.service.export.return_value = [('wallets.csv', b'users'), ('wallet_ledger.csv', b'ledger')]
         await view.download.callback(i)
-        self.service.export.assert_called_once_with(100000, ('USERS', 'LEDGER'))
+        self.service.export.assert_called_once_with(100000, ('wallets', 'wallet_ledger'))
         self.assertEqual(len(i.followup.send.call_args.kwargs['files']), 2)
