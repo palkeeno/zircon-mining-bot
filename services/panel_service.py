@@ -7,7 +7,7 @@ import discord
 
 import config.config as config
 from consts.characters import get_random_character
-from models import wallet
+from services.runtime import wallet_service
 from services.mining_service import get_channel
 from views.wallet_view import MiningView, WalletView
 
@@ -25,7 +25,7 @@ def character_embed(character):
 async def ensure_panels(client, *, force=True):
     async with panel_lock:
         config.settings.load_settings()
-        period = wallet.current_period()
+        period = wallet_service.current_period()
         changed = config.settings.get('mining_panel_period') != period
         if not force and not changed and all(config.settings.get(k) for k in ('mining_message_id', 'wallet_message_id')):
             return

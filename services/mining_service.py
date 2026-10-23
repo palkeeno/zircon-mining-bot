@@ -3,7 +3,7 @@ import random
 from pathlib import Path
 import discord
 from utils.helpers import get_country, gacha, has_mining_role
-from models import wallet
+from services.runtime import wallet_service
 import config.config as config
 from config.role_manager import RoleProbabilityManager
 from consts import sysmsg as SysMsg
@@ -78,7 +78,7 @@ async def mining_zircon(interaction: discord.Interaction, client):
         fn_gif = random.choice(gifs).name
         fn_img = random.choice(images).name
         try:
-            total = wallet.claim(interaction.user.id, result["zirnum"], isExcellent, interaction.id)
+            total = wallet_service.claim(interaction.user.id, result["zirnum"], isExcellent, interaction.id)
             credited = True
         except ValueError as error:
             await interaction.followup.send(str(error), ephemeral=True)

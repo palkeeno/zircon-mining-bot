@@ -3,7 +3,7 @@ import logging
 import discord
 
 import config.config as config
-from models import wallet
+from services.runtime import wallet_service
 from services.mining_service import mining_zircon
 from utils.helpers import get_country
 from services.access import require_guild
@@ -25,7 +25,7 @@ class RankingView(SafeView):
     def __init__(self, owner, guild, kind):
         super().__init__(timeout=180)
         self.owner, self.guild, self.kind = owner, guild, kind
-        self.rows = wallet.ranking(kind)
+        self.rows = wallet_service.ranking(kind)
         self.page = 0
         self.update_buttons()
 
@@ -86,7 +86,7 @@ class WalletView(SafeView):
 
     @discord.ui.button(label="自分の保有数", custom_id="self_stats")
     async def own(self, interaction, button):
-        amount, count, excellent = wallet.balance(interaction.user.id)
+        amount, count, excellent = wallet_service.balance(interaction.user.id)
         await interaction.response.send_message(
             f"💎 保有数：{amount:,}\nExcellent：{excellent:,}回\n採掘：{count:,}回", ephemeral=True)
 
@@ -101,4 +101,3 @@ class WalletView(SafeView):
     @discord.ui.button(label="Excellentランキング", custom_id="excellent_rank")
     async def excellents(self, interaction, button):
         await self.show_rank(interaction, "excellent")
-

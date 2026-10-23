@@ -22,7 +22,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
                                        send=AsyncMock(return_value=self.message))
         for target, attr, value in (
             (panels.config, 'settings', self.settings),
-            (panels.wallet, 'current_period', Mock(return_value='2026-10-23T12:00:00+09:00')),
+            (panels.wallet_service, 'current_period', Mock(return_value='2026-10-23T12:00:00+09:00')),
             (panels, 'get_channel', AsyncMock(return_value=self.channel)),
         ):
             patcher = patch.object(target, attr, value)
@@ -36,7 +36,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.channel.fetch_message.await_count, 2)
         await panels.ensure_panels(Mock())
         self.assertEqual(self.settings.get('mining_panel_character'), first)
-        panels.wallet.current_period.return_value = '2026-10-24T00:00:00+09:00'
+        panels.wallet_service.current_period.return_value = '2026-10-24T00:00:00+09:00'
         await panels.ensure_panels(Mock(), force=False)
         self.assertNotEqual(self.settings.get('mining_panel_character')['id'], first['id'])
         self.channel.send.assert_not_awaited()

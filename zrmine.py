@@ -8,6 +8,7 @@ from discord.ext import tasks
 
 import config.config as config
 from models import wallet
+from services.runtime import wallet_service
 from utils.backup import perform_backup, create_backup
 from services.access import require_guild
 from views.settings_view import SettingsView, summary
@@ -63,7 +64,7 @@ async def settings(interaction: discord.Interaction):
 async def transact(interaction, amount, source=None, target=None, kind="transfer", success_message=None):
     await interaction.response.defer(ephemeral=True)
     try:
-        wallet.change(amount, actor=interaction.user.id, request_id=interaction.id,
+        wallet_service.change(amount, actor=interaction.user.id, request_id=interaction.id,
                       source=source, target=target, kind=kind)
     except ValueError as error:
         await interaction.followup.send(str(error), ephemeral=True)
@@ -99,22 +100,16 @@ async def transfer(interaction: discord.Interaction, source: discord.Member, tar
 @tree.command(name="donate", description="所属国の国庫にジルコンを寄付します")
 @app_commands.guild_only()
 async def donate(interaction: discord.Interaction, amount: app_commands.Range[int, 1, 1000000000]):
-    config.settings.load_settings()
-    roles = {role.id for role in interaction.user.roles}
-    countries = [country for country in config.COUNTRIES if country['role'] in roles]
-    if len(countries) != 1:
-        await interaction.response.send_message("所属国を1つに確定できません。国ロールを確認してください。", ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
+    try:
+        receipt = wallet_service.donate(actor=interaction.user.id,
+                                        roles={role.id for role in interaction.user.roles},
+                                        amount=amount, request_id=interaction.id)
+    except ValueError as error:
+        await interaction.followup.send(str(error), ephemeral=True)
         return
-    country = countries[0]
-    treasury = config.get_treasury_user_id(country['id'])
-    if not treasury:
-        await interaction.response.send_message("寄付先の国庫が未設定です。管理者にお問い合わせください。", ephemeral=True)
-        return
-    if any(config.get_treasury_user_id(other['id']) == treasury for other in config.COUNTRIES if other['id'] != country['id']):
-        await interaction.response.send_message("複数国に同じ国庫が設定されています。管理者にお問い合わせください。", ephemeral=True)
-        return
-    await transact(interaction, amount, source=interaction.user.id, target=treasury, kind="donate",
-                   success_message=f"{country['name']}の国庫（<@{treasury}>）へ {amount:,} 💎 寄付しました。")
+    await interaction.followup.send(
+        f"{receipt.country}の国庫（<@{receipt.target}>）へ {receipt.amount:,} 💎 寄付しました。", ephemeral=True)
 
 
 @tree.error

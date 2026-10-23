@@ -1,23 +1,16 @@
 """Personal balances, mining claims and audit entries share one SQLite transaction."""
 import sqlite3
 from contextlib import contextmanager, closing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import config.config as config
+from domain.mining_period import JST, scheduled_period
 
-JST = timezone(timedelta(hours=9))
 MAX_AMOUNT = 2**63 - 1
 
 
 def period_start(now=None):
-    now = (now or datetime.now(JST)).astimezone(JST)
-    hours = config.get_announce_hour()
-    minutes = config.get_announce_minute()
-    boundaries = [
-        (now - timedelta(days=day)).replace(hour=h, minute=m, second=0, microsecond=0)
-        for day in (0, 1) for h in hours for m in minutes
-    ]
-    return max(t for t in boundaries if t <= now).isoformat()
+    return scheduled_period(now, config.get_announce_hour(), config.get_announce_minute())
 
 
 @contextmanager

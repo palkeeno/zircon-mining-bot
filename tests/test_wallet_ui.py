@@ -21,7 +21,7 @@ def interaction(admin=False):
 
 class UITests(unittest.IsolatedAsyncioTestCase):
     async def test_both_ranking_buttons_respond_ephemerally(self):
-        with patch("views.wallet_view.wallet.ranking", return_value=[]):
+        with patch("views.wallet_view.wallet_service.ranking", return_value=[]):
             for callback in (WalletView().balances, WalletView().excellents):
                 i = interaction()
                 await callback.callback(i)
@@ -62,7 +62,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         with patch.object(mining_service.config, "get_mine_open", return_value=True), \
              patch.object(mining_service, "has_mining_role", return_value=True), \
              patch.object(mining_service, "gacha", return_value={"id": 0, "msg": "Excellent", "zirnum": 10}), \
-             patch.object(mining_service.wallet, "claim", return_value=42) as claim, \
+             patch.object(mining_service.wallet_service, "claim", return_value=42) as claim, \
              patch.object(mining_service.asyncio, "sleep", new=AsyncMock()), \
              patch.object(mining_service, "send_excellent_notification", new=AsyncMock()) as notify:
             await mining_service.mining_zircon(i, i.client)
@@ -83,7 +83,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         view = WalletView()
         self.assertTrue(view.is_persistent())
         i = interaction()
-        with patch("views.wallet_view.wallet.balance", return_value=(42, 3, 1)):
+        with patch("views.wallet_view.wallet_service.balance", return_value=(42, 3, 1)):
             await view.own.callback(i)
         self.assertTrue(i.response.send_message.call_args.kwargs["ephemeral"])
         self.assertIn("42", i.response.send_message.call_args.args[0])
@@ -91,7 +91,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
     async def test_rank_pages_ten_entries_and_boundaries(self):
         rows = [(100 + n, n, n, n * 2) for n in range(21)]
         i = interaction()
-        with patch("views.wallet_view.wallet.ranking", return_value=rows):
+        with patch("views.wallet_view.wallet_service.ranking", return_value=rows):
             view = RankingView(100, i.guild, "excellent")
         self.assertEqual(len(view.embed().description.splitlines()), 10)
         self.assertTrue(view.previous.disabled)
@@ -107,7 +107,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await view.interaction_check(i))
 
     async def test_empty_rank_has_no_navigation(self):
-        with patch("views.wallet_view.wallet.ranking", return_value=[]):
+        with patch("views.wallet_view.wallet_service.ranking", return_value=[]):
             view = RankingView(100, interaction().guild, "balance")
         self.assertTrue(view.next.disabled)
         self.assertTrue(view.previous.disabled)
@@ -116,7 +116,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
     async def test_balance_ranking_has_name_country_and_amount(self):
         member = SimpleNamespace(display_name="Alice", roles=[])
         guild = SimpleNamespace(get_member=Mock(return_value=member))
-        with patch("views.wallet_view.wallet.ranking", return_value=[(100, 42, 1, 2)]), patch("views.wallet_view.get_country", return_value={"stmp": "🌟"}):
+        with patch("views.wallet_view.wallet_service.ranking", return_value=[(100, 42, 1, 2)]), patch("views.wallet_view.get_country", return_value={"stmp": "🌟"}):
             view = RankingView(100, guild, "balance")
             self.assertIn("🌟 Alice：💎 42", view.embed().description)
 
@@ -134,20 +134,19 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         for country in countries:
             i = interaction()
             i.user.roles = [SimpleNamespace(id=country['role'])]
-            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", side_effect=lambda n: 900 + n), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
+            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", side_effect=lambda n: 900 + n), patch.object(zrmine.wallet_service, "change") as transact:
                 await zrmine.donate.callback(i, 8)
-            transact.assert_awaited_once_with(i, 8, source=100, target=900 + country['id'], kind="donate",
-                                             success_message=f"{country['name']}の国庫（<@{900 + country['id']}>）へ 8 💎 寄付しました。")
+            transact.assert_called_once_with(8, actor=100, request_id=i.id, source=100, target=900 + country['id'], kind="donate")
 
     async def test_donation_rejects_ambiguous_membership_or_treasuries(self):
         countries = [dict(id=n, role=200 + n) for n in range(1, 5)]
         for role_ids, treasury in (([], 999), ([201, 202], 999), ([201], 0), ([201], 999)):
             i = interaction()
             i.user.roles = [SimpleNamespace(id=role_id) for role_id in role_ids]
-            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", return_value=treasury), patch.object(zrmine, "transact", new=AsyncMock()) as transact:
+            with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", return_value=treasury), patch.object(zrmine.wallet_service, "change") as transact:
                 await zrmine.donate.callback(i, 8)
-            transact.assert_not_awaited()
-            self.assertTrue(i.response.send_message.call_args.kwargs['ephemeral'])
+            transact.assert_not_called()
+            self.assertTrue(i.followup.send.call_args.kwargs['ephemeral'])
 
     async def test_excellent_uses_actual_result_image(self):
         user = SimpleNamespace(display_name="Alice", display_avatar=SimpleNamespace(url="https://example.com/avatar.png"))
@@ -160,7 +159,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
     async def test_closed_or_missing_role_does_not_credit(self):
         for opened, role in ((False, True), (True, False)):
             i = interaction()
-            with patch.object(mining_service.config, "get_mine_open", return_value=opened), patch.object(mining_service, "has_mining_role", return_value=role), patch.object(mining_service.wallet, "claim") as claim:
+            with patch.object(mining_service.config, "get_mine_open", return_value=opened), patch.object(mining_service, "has_mining_role", return_value=role), patch.object(mining_service.wallet_service, "claim") as claim:
                 await mining_service.mining_zircon(i, Mock())
             claim.assert_not_called()
             self.assertTrue(i.response.send_message.call_args.kwargs["ephemeral"])
