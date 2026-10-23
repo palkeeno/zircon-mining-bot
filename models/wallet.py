@@ -48,6 +48,9 @@ def initialize():
             request_id TEXT PRIMARY KEY, actor INTEGER, source INTEGER, target INTEGER,
             amount INTEGER, kind TEXT, created_at TEXT)""")
         db.execute("CREATE TABLE IF NOT EXISTS WALLET_META (key TEXT PRIMARY KEY, value TEXT)")
+        db.execute("""CREATE TABLE IF NOT EXISTS RESET_LOG (
+            request_id TEXT PRIMARY KEY, actor INTEGER NOT NULL,
+            period TEXT NOT NULL, created_at TEXT NOT NULL)""")
         if not db.execute("SELECT 1 FROM WALLET_META WHERE key='legacy_claims'").fetchone():
             # Keep legacy DB untouched. Carry the most recent personal claim across
             # cutover so changing country cannot grant an extra attempt.
@@ -119,9 +122,9 @@ def change(amount, *, actor, request_id, source=None, target=None, kind="transfe
 
 def claim(uid, amount, excellent, request_id, now=None):
     positive(amount)
-    period = period_start(now)
     limit = int(config.settings.get("mining_limit", 1))
     with transaction() as db:
+        period = current_period(now, db=db)
         ensure_user(db, uid)
         row = db.execute("SELECT period,count FROM CLAIMS WHERE userid=?", (uid,)).fetchone()
         # Never move backwards after schedule changes or clock corrections.
@@ -141,6 +144,33 @@ def claim(uid, amount, excellent, request_id, now=None):
             raise ValueError("残高が上限を超えます。")
         audit(db, request_id, uid, None, uid, amount, "mine")
         return db.execute("SELECT curr_total FROM USERS WHERE userid=?", (uid,)).fetchone()[0]
+
+
+def current_period(now=None, *, db=None):
+    if db is None:
+        with closing(sqlite3.connect(config.DB_USERS)) as connection:
+            return current_period(now, db=connection)
+    manual = db.execute("SELECT value FROM WALLET_META WHERE key='manual_period'").fetchone()
+    return max(period_start(now), manual[0]) if manual else period_start(now)
+
+
+def reset_claims(*, actor, request_id, now=None):
+    """Start a fresh claim period without changing balances or mining records."""
+    now = (now or datetime.now(JST)).astimezone(JST)
+    with transaction() as db:
+        if db.execute("SELECT 1 FROM RESET_LOG WHERE request_id=?", (str(request_id),)).fetchone():
+            raise ValueError("このリセットは処理済みです。")
+        previous = db.execute("SELECT value FROM WALLET_META WHERE key='manual_period'").fetchone()
+        boundary = max(now, datetime.fromisoformat(period_start(now)))
+        if previous:
+            boundary = max(boundary, datetime.fromisoformat(previous[0]) + timedelta(microseconds=1))
+        period = boundary.isoformat()
+        db.execute("DELETE FROM CLAIMS")
+        db.execute("""INSERT INTO WALLET_META VALUES ('manual_period',?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value""", (period,))
+        db.execute("INSERT INTO RESET_LOG VALUES (?,?,?,?)",
+                   (str(request_id), actor, period, now.isoformat()))
+        return period
 
 
 def ranking(kind):

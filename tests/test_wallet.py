@@ -137,6 +137,34 @@ class WalletTests(unittest.TestCase):
         wallet.config.settings.update({"announce_hour": [6, 18], "announce_minute": [30]})
         self.assertEqual(wallet.period_start(self.now.replace(hour=1)), "2026-10-19T18:30:00+09:00")
 
+    def test_manual_reset_preserves_wallet_and_next_scheduled_boundary(self):
+        wallet.claim(100, 10, True, 'before', self.now)
+        self.grant(200, 7)
+        reset_time = self.now.replace(hour=11)
+        wallet.reset_claims(actor=999, request_id='reset', now=reset_time)
+        self.assertEqual(wallet.balance(100), (10, 1, 1))
+        self.assertEqual(wallet.balance(200), (7, 0, 0))
+        wallet.initialize()
+        wallet.claim(100, 1, False, 'after', reset_time)
+        with self.assertRaises(ValueError):
+            wallet.claim(100, 1, False, 'denied', reset_time)
+        with self.assertRaises(ValueError):
+            wallet.reset_claims(actor=999, request_id='reset', now=reset_time)
+        with self.assertRaises(ValueError):
+            wallet.claim(100, 1, False, 'still-denied', reset_time)
+        wallet.claim(100, 1, False, 'noon', self.now.replace(hour=12))
+        self.assertEqual(wallet.balance(100), (12, 3, 1))
+        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db:
+            self.assertEqual(db.execute('SELECT actor FROM RESET_LOG').fetchall(), [(999,)])
+
+    def test_repeated_manual_resets_at_same_time_have_distinct_periods(self):
+        first = wallet.reset_claims(actor=999, request_id='reset1', now=self.now)
+        wallet.claim(100, 1, False, 'one', self.now)
+        second = wallet.reset_claims(actor=999, request_id='reset2', now=self.now)
+        self.assertGreater(second, first)
+        wallet.claim(100, 1, False, 'two', self.now)
+        self.assertEqual(wallet.balance(100), (2, 2, 0))
+
     def test_settings_persist_and_failed_write_preserves_previous_value(self):
         settings = wallet.config.settings
         settings.update({"mining_role": 987, "treasury_user_id": 654, "excellent_chat": 321})
