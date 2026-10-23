@@ -15,6 +15,20 @@ import zrmine
 
 
 class EnvironmentTests(unittest.TestCase):
+    def test_backup_cleanup_ignores_old_database_and_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('wallet.db_20200101', 'mining.db_20200101', 'notes.txt'):
+                (root / name).write_text('keep unless wallet backup')
+            with patch.object(backup.config, 'DB_WALLET', 'wallet.db'), \
+                 patch.object(backup.config, 'BACKUP_DIR', str(root)), \
+                 patch.object(backup.os.path, 'getctime', return_value=0):
+                backup.cleanup_old_backups()
+                backup.cleanup_excess_backups(0)
+            self.assertFalse((root / 'wallet.db_20200101').exists())
+            self.assertTrue((root / 'mining.db_20200101').exists())
+            self.assertTrue((root / 'notes.txt').exists())
+
     def test_settings_and_role_writes_are_isolated(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
