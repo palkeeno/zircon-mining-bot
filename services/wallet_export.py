@@ -16,12 +16,16 @@ def csv_value(value):
     return value
 
 
-def export_wallet(database):
+def export_wallet(database, tables=TABLES):
+    selected = tuple(tables)
+    if not selected or any(table not in TABLES for table in selected):
+        raise ValueError('ダウンロードする情報を選択してください。')
+    selected = [table for table in TABLES if table in selected]
     files = []
     uri = Path(database).resolve().as_uri() + '?mode=ro'
     with closing(sqlite3.connect(uri, uri=True)) as db:
         db.execute('BEGIN')
-        for table in TABLES:
+        for table in selected:
             cursor = db.execute(f'SELECT * FROM {table} ORDER BY rowid')
             output = io.StringIO(newline='')
             writer = csv.writer(output)

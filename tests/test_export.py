@@ -13,6 +13,14 @@ from services.wallet_export import export_wallet, package_exports
 class ExportTests(unittest.TestCase):
     setUp = test_wallet.WalletTests.setUp
     grant = test_wallet.WalletTests.grant
+
+    def test_only_selected_tables_are_exported_and_invalid_selections_are_rejected(self):
+        files = export_wallet(wallet.config.DB_USERS, ['RESET_LOG', 'USERS', 'USERS'])
+        self.assertEqual([name for name, _ in files], ['wallet_users.csv', 'wallet_reset_log.csv'])
+        for tables in ([], ['unknown'], ['USERS; DROP TABLE USERS']):
+            with self.assertRaises(ValueError):
+                export_wallet(wallet.config.DB_USERS, tables)
+
     def test_csv_snapshot_includes_headers_history_and_no_wallet_mutation(self):
         self.grant()
         wallet.reset_claims(actor=999, request_id='reset', now=self.now)
