@@ -1,5 +1,6 @@
 import os
-from contextlib import closing
+import io
+from contextlib import closing, redirect_stdout
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -23,8 +24,10 @@ class EnvironmentTests(unittest.TestCase):
             with patch.object(backup.config, 'DB_WALLET', 'wallet.db'), \
                  patch.object(backup.config, 'BACKUP_DIR', str(root)), \
                  patch.object(backup.os.path, 'getctime', return_value=0):
-                backup.cleanup_old_backups()
-                backup.cleanup_excess_backups(0)
+                # Windows CI uses a Western code page: cleanup must not depend on Japanese stdout.
+                with io.TextIOWrapper(io.BytesIO(), encoding='cp1252') as output, redirect_stdout(output):
+                    backup.cleanup_old_backups()
+                    backup.cleanup_excess_backups(0)
             self.assertFalse((root / 'wallet.db_20200101').exists())
             self.assertTrue((root / 'mining.db_20200101').exists())
             self.assertTrue((root / 'notes.txt').exists())

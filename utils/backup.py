@@ -1,10 +1,13 @@
 import os
+import logging
 import sqlite3
 from contextlib import closing
 import datetime
 from typing import List
 import config.config as config
 from domain.mining_period import JST
+
+log = logging.getLogger(__name__)
 
 def create_backup() -> List[str]:
     """データベースのバックアップを作成する
@@ -48,9 +51,9 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
         if file_time < cutoff_date:
             try:
                 os.remove(file_path)
-                print(f"バックアップ削除（期限超過）: {file_path}")
-            except Exception as e:
-                print(f"バックアップ削除失敗: {file_path} {e}")
+                log.info('Removed expired wallet backup: %s', file_path)
+            except OSError:
+                log.exception('Could not remove wallet backup: %s', file_path)
 
 def cleanup_excess_backups(max_files: int = 10) -> None:
     """各DBごとにバックアップファイルがmax_files個を超えていたら古いものから削除する"""
@@ -64,9 +67,9 @@ def cleanup_excess_backups(max_files: int = 10) -> None:
             for fname in to_delete:
                 try:
                     os.remove(os.path.join(backup_dir, fname))
-                    print(f"バックアップ削除（個数超過）: {os.path.join(backup_dir, fname)}")
-                except Exception as e:
-                    print(f"バックアップ削除失敗: {os.path.join(backup_dir, fname)} {e}")
+                    log.info('Removed excess wallet backup: %s', os.path.join(backup_dir, fname))
+                except OSError:
+                    log.exception('Could not remove wallet backup: %s', os.path.join(backup_dir, fname))
 
 def perform_backup() -> List[str]:
     """バックアップを実行し、古いバックアップ・個数超過バックアップを削除する
