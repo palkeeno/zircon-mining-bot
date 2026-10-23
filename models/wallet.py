@@ -44,26 +44,6 @@ def initialize():
         db.execute("""CREATE TABLE IF NOT EXISTS RESET_LOG (
             request_id TEXT PRIMARY KEY, actor INTEGER NOT NULL,
             period TEXT NOT NULL, created_at TEXT NOT NULL)""")
-        if not db.execute("SELECT 1 FROM WALLET_META WHERE key='legacy_claims'").fetchone():
-            # Keep legacy DB untouched. Carry the most recent personal claim across
-            # cutover so changing country cannot grant an extra attempt.
-            from pathlib import Path
-            if config.DB_MINING and Path(config.DB_MINING).is_file():
-                with closing(sqlite3.connect(Path(config.DB_MINING).resolve().as_uri() + "?mode=ro", uri=True)) as old:
-                    if old.execute("SELECT 1 FROM sqlite_master WHERE name='MINING'").fetchone():
-                        period = period_start()
-                        for uid, stamp in old.execute(
-                            "SELECT userid, MAX(updated_at) FROM MINING WHERE done_flag=1 AND userid>4 GROUP BY userid"
-                        ):
-                            try:
-                                mined = datetime.fromisoformat(stamp)
-                                if mined.tzinfo is None:
-                                    mined = mined.replace(tzinfo=JST)
-                                if mined >= datetime.fromisoformat(period):
-                                    db.execute("INSERT OR IGNORE INTO CLAIMS VALUES (?, ?, 1)", (uid, period))
-                            except (ValueError, TypeError):
-                                raise ValueError(f"旧採掘日時が不正です: user={uid}")
-            db.execute("INSERT INTO WALLET_META VALUES ('legacy_claims','1')")
 
 
 def ensure_user(db, uid):

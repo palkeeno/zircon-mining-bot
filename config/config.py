@@ -19,7 +19,6 @@ settings = settings_manager
 
 #### Load Env (Sensitive Information) ####
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DB_MINING = os.getenv("DB_MINING")
 DB_USERS = os.getenv("DB_USERS")
 CWD = os.getenv("CWD")
 MCH = int(os.getenv("MCH"))

@@ -20,7 +20,6 @@ class WalletTests(unittest.TestCase):
         settings.update({"announce_hour": [0, 12], "announce_minute": [0], "mining_limit": 1})
         for key, value in {
             "DB_USERS": str(Path(self.temp.name) / "users.db"),
-            "DB_MINING": str(Path(self.temp.name) / "mining.db"),
             "settings": settings,
         }.items():
             p = patch.object(wallet.config, key, value)
@@ -118,20 +117,6 @@ class WalletTests(unittest.TestCase):
         self.grant(300, 10, "c")
         self.assertEqual([row[0] for row in wallet.ranking("balance")], [100, 300, 200])
         self.assertEqual(wallet.ranking("excellent")[0], (200, 3, 1, 1))
-
-    def test_legacy_migration_preserves_balances_and_personal_claim(self):
-        self.grant()
-        with closing(sqlite3.connect(wallet.config.DB_USERS)) as db, db:
-            db.execute("DELETE FROM WALLET_META")
-        with closing(sqlite3.connect(wallet.config.DB_MINING)) as db, db:
-            db.execute("CREATE TABLE MINING (userid,roleid,done_flag,updated_at)")
-            stamp = self.now.isoformat()
-            db.executemany("INSERT INTO MINING VALUES (?,?,?,?)", [(100, 1, 1, stamp), (100, 2, 1, stamp)])
-        with patch.object(wallet, "period_start", return_value=self.now.replace(hour=0).isoformat()):
-            wallet.initialize()
-            with self.assertRaises(ValueError):
-                wallet.claim(100, 10, False, "new")
-        self.assertEqual(wallet.balance(100), (20, 0, 0))
 
     def test_period_before_first_daily_reset(self):
         wallet.config.settings.update({"announce_hour": [6, 18], "announce_minute": [30]})
