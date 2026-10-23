@@ -121,7 +121,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("🌟 Alice：💎 42", view.embed().description)
 
     async def test_admin_commands_and_components_recheck_permissions(self):
-        for command in (zrmine.add, zrmine.remove, zrmine.transfer, zrmine.settings):
+        for command in (zrmine.tree.get_command("add"), zrmine.tree.get_command("remove"), zrmine.tree.get_command("transfer"), zrmine.tree.get_command("settings")):
             self.assertTrue(command.default_permissions.administrator)
             self.assertFalse(await command.checks[0](interaction(False)))
             self.assertTrue(await command.checks[0](interaction(True)))
@@ -135,7 +135,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
             i = interaction()
             i.user.roles = [SimpleNamespace(id=country['role'])]
             with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", side_effect=lambda n: 900 + n), patch.object(zrmine.wallet_service, "change") as transact:
-                await zrmine.donate.callback(i, 8)
+                await zrmine.tree.get_command("donate").callback(i, 8)
             transact.assert_called_once_with(8, actor=100, request_id=i.id, source=100, target=900 + country['id'], kind="donate")
 
     async def test_donation_rejects_ambiguous_membership_or_treasuries(self):
@@ -144,7 +144,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
             i = interaction()
             i.user.roles = [SimpleNamespace(id=role_id) for role_id in role_ids]
             with patch.object(zrmine.config, "COUNTRIES", countries), patch.object(zrmine.config, "get_treasury_user_id", return_value=treasury), patch.object(zrmine.wallet_service, "change") as transact:
-                await zrmine.donate.callback(i, 8)
+                await zrmine.tree.get_command("donate").callback(i, 8)
             transact.assert_not_called()
             self.assertTrue(i.followup.send.call_args.kwargs['ephemeral'])
 
