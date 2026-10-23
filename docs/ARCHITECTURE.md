@@ -23,7 +23,8 @@
 | `views/` | ボタン・フォーム・ページ送り、利用時の権限確認 |
 | `services/wallet_service.py` | 残高操作の共通窓口、所属国からの寄付先決定、リセット・出力の委譲 |
 | `services/runtime.py` | 実行時サービスの構築 |
-| `models/wallet.py` | SQLite移行・読み書き、残高と採掘権と履歴の一括更新、操作IDの重複防止 |
+| `models/wallet.py` | SQLite読み書き、残高と採掘権と履歴の一括更新、操作IDの重複防止 |
+| `models/wallet_schema.py` | 新規スキーマ作成とバージョン確認。旧DBの取り込みは行わない |
 | `domain/mining_period.py` | Discord・設定・DBに依存しない日本時間の期間計算 |
 | `services/panel_service.py` | 常設投稿の取得・更新・復旧、期間ごとのキャラ選択と再試行 |
 | `services/mining_service.py` | 採掘演出・抽選・結果・Excellent通知の調整 |
@@ -37,7 +38,7 @@
 
 ## 検証の境界
 
-実SQLiteテストで移行・同時更新・二重操作・期間・手動リセットを検証する。Discordアダプターのテストで権限・本人限定表示・ファイルの解放・通信失敗時の挙動を検証する。実Discordの画面操作は別の検証記録に残す。
+実SQLiteテストで初期化・制約・再起動時の保持・旧形式拒否・同時更新・二重操作・期間・手動リセットを検証する。Discordアダプターのテストで権限・本人限定表示・ファイルの解放・通信失敗時の挙動を検証する。実Discordの画面操作は別の検証記録に残す。
 
 ## 参考にした一次資料
 
