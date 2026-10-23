@@ -1,14 +1,13 @@
 """Discord slash-command adapter; wallet policy lives in WalletService."""
 import asyncio
-import io
 import logging
-from contextlib import ExitStack
 
 import discord
 from discord import app_commands
 
 from services.panel_service import ensure_panels
 from views.settings_view import SettingsView, summary
+from views.export_view import ExportView
 
 log = logging.getLogger(__name__)
 
@@ -103,21 +102,10 @@ def register_commands(tree, service):
     @app_commands.default_permissions(administrator=True)
     @administrator()
     async def exportwallet(interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            files = await asyncio.to_thread(service.export, interaction.guild.filesize_limit)
-        except ValueError as error:
-            await interaction.followup.send(str(error), ephemeral=True)
-            return
-        with ExitStack() as stack:
-            attachments = []
-            for name, data in files:
-                stream = stack.enter_context(io.BytesIO(data))
-                attachment = discord.File(stream, filename=name)
-                stack.callback(attachment.close)
-                attachments.append(attachment)
-            await interaction.followup.send('walletデータベースのCSVです。Discord IDは文字列として読み込んでください。',
-                                            files=attachments, ephemeral=True)
+        await interaction.response.send_message(
+            'ダウンロードする情報を選択し、「選択した情報をダウンロード」を押してください。\n'
+            '選択画面は3分間利用できます。',
+            view=ExportView(interaction.user.id, service), ephemeral=True)
 
     @tree.error
     async def command_error(interaction, error):
