@@ -55,7 +55,7 @@ class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_unaffiliated_member_uses_common_chat(self):
-        with patch.object(mining_service.config, "MINING_EXCELLENT_CHAT", 456):
+        with patch.object(mining_service.config, "get_excellent_chat", return_value=456):
             self.assertEqual(456, mining_service.get_excellent_channel_id(None))
 
     async def test_cached_channel_is_used(self):
@@ -92,7 +92,7 @@ class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
         embed = object()
 
         with (
-            patch.object(mining_service.config, "MINING_EXCELLENT_CHAT", 456),
+            patch.object(mining_service.config, "get_excellent_chat", return_value=456),
             patch.object(mining_service.discord, "File", return_value=file),
             patch.object(mining_service, "excellent", return_value=embed),
         ):
