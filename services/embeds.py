@@ -1,7 +1,6 @@
 import discord
 import traceback
 
-from utils.helpers import ordinal
 
 
 # エラーハンドリング関数
@@ -57,78 +56,3 @@ def excellent(user, filename):
     except Exception as e:
         handle_embed_error(e, "excellent")
         return discord.Embed(title="エラー", description="Excellent結果の表示中にエラーが発生しました。", color=0xFF0000)
-
-
-# 指定国の統計データembed(ジェム数、採掘回数、自分のランク、Top10)
-def stats_country(res_country, country_name, res_rank, rank_self):
-    try:
-        rank = ordinal(rank_self) if rank_self != 0 else "None"
-        embed = discord.Embed(
-            title=f"{country_name}国 サマリ", description="", color=0x0000FF
-        )
-        embed.set_thumbnail(url=f"attachment://{country_name}.jpg")
-        # 統計データ表示
-        embed.add_field(
-            name=f"""
-ジルコン : {int(res_country[1])} :gem:
-採掘回数 : {int(res_country[2])} :pick:
-            """,
-            value="",
-            inline=False,
-        )
-
-        # ランキング表示
-        embed.add_field(name="ランキングTOP10", value=f"Your Rank: {rank}", inline=False)
-        # res_rank[[user_mention1, zirnum1,...], [user_mention2, zirnum2,...],...]
-        top10List = []
-        for index in range(min(10, len(res_rank))):
-            top10List.append(
-                f"**{res_rank[index][0]}.** `{res_rank[index][1]}` • :gem: {res_rank[index][2]}"
-            )
-        top10Str = "\n".join(top10List)
-
-        embed.add_field(name="", value=f"{top10Str}", inline=False)
-        return embed
-    except Exception as e:
-        handle_embed_error(e, "stats_country")
-        return discord.Embed(title="エラー", description="国統計情報の表示中にエラーが発生しました。", color=0xFF0000)
-
-
-# 自分の統計データembed(ジェム数、採掘回数、Ex数、国内順位)
-def stats_self(result_mining, result_lifetime, usr, rank_self):
-    try:
-        rank = ordinal(rank_self) if rank_self != 0 else "None"
-        embed = discord.Embed(title="", description="", color=0x0000FF)
-        embed.set_author(
-            name=f"{usr.display_name} 採掘データ", icon_url=usr.display_avatar.url
-        )
-
-        embed.add_field(
-            name=f"""
-ジルコン : {int(result_mining[3])} :gem: （累積 {int(result_lifetime[2])}）
-採掘回数 : {int(result_mining[4])} :pick: （累積 {int(result_lifetime[4])}）
-Excellent : {int(result_mining[5])} :tada: （累積 {int(result_lifetime[5])}）
-            """,
-            value=f"国内順位 {rank}",
-            inline=False,
-        )
-        return embed
-    except Exception as e:
-        handle_embed_error(e, "stats_self")
-        return discord.Embed(title="エラー", description="個人統計情報の表示中にエラーが発生しました。", color=0xFF0000)
-
-
-# 国対抗ランキングのembed
-def rank_country(result):
-    try:
-        embed = discord.Embed(title="国対抗ランキング", description="", color=0x0000FF)
-        for rank, res in enumerate(result):
-            embed.add_field(
-                name=f"{rank+1} : {res[0]['stmp']} {res[0]['name']} : {res[1]} :gem:",
-                value="",
-                inline=False,
-            )
-        return embed
-    except Exception as e:
-        handle_embed_error(e, "rank_country")
-        return discord.Embed(title="エラー", description="国ランキング情報の表示中にエラーが発生しました。", color=0xFF0000)

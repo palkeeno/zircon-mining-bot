@@ -4,7 +4,7 @@ from contextlib import closing
 import datetime
 from typing import List
 import config.config as config
-from consts.const import JST
+from domain.mining_period import JST
 
 def create_backup() -> List[str]:
     """データベースのバックアップを作成する
