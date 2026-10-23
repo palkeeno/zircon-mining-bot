@@ -22,7 +22,7 @@ Discordで常設の採掘ボタンを押し、個人のログインポイント�
 | `/remove user amount` | Administrator | 残高を引き去る |
 | `/transfer source target amount` | Administrator | 任意のユーザー間で転送 |
 | `/resetmining` | Administrator | 全員の採掘回数を即時リセット（残高・実績は維持） |
-| `/exportwallet` | Administrator | wallet全5テーブルをCSVで取得 |
+| `/exportwallet` | Administrator | 必要な情報を複数選択してCSVで取得 |
 | `/donate amount` | 一般ユーザー | 自分の所属国の国庫へ自動で寄付 |
 
 管理チャンネルにいるだけでは管理操作できません。設定ビュー・選択メニュー・入力フォームでも権限を再確認します。すべての操作は採掘チャンネルが属するサーバーに限定します。
@@ -88,7 +88,7 @@ ENV=production python zrmine.py
 
 `/resetmining` は全員の採掘権を回復し、新しい期間境界を永続化します。定時スケジュール・OPEN/CLOSE・残高・実績は変えません。次の定時境界から通常の期間に戻ります。操作IDと実行者を `RESET_LOG` に記録し、同じ操作の二重実行を防ぎます。既存DBは再作成せず、起動時に必要なテーブルを追加します。
 
-`/exportwallet` は1つの読み取りスナップショットから `USERS`、`CLAIMS`、`LEDGER`、`WALLET_META`、`RESET_LOG` をUTF-8 BOM付きCSVにして本人限定で返します。添付上限を超えるCSVがあればZIP化し、それでも超える場合はエラーを返します。Discord IDは表計算ソフトで文字列として読み込んでください。CSVからの復元機能は含みません。
+`/exportwallet` は本人限定の日本語の複数選択メニューを開きます。必要な情報を1〜5種類選び、「選択した情報をダウンロード」を押すと、選択したテーブルだけを1つの読み取りスナップショットから `USERS`、`CLAIMS`、`LEDGER`、`WALLET_META`、`RESET_LOG` のうち選んだものをUTF-8 BOM付きCSVにして本人限定で返します。添付上限を超えるCSVがあればZIP化し、それでも超える場合はエラーを返します。Discord IDは表計算ソフトで文字列として読み込んでください。CSVからの復元機能は含みません。
 
 設計の選定理由と依存関係は [アーキテクチャ](docs/ARCHITECTURE.md) を参照してください。
 
