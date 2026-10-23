@@ -53,38 +53,49 @@ def balance(uid):
         return row or (0, 0, 0)
 
 
-def audit(db, request_id, actor, source, target, amount, kind):
+def audit(db, request_id, actor, source, target, amount, kind, timestamp):
     db.execute("INSERT INTO wallet_ledger (request_id,actor_id,source_id,target_id,amount,kind,created_at) VALUES (?,?,?,?,?,?,?)",
-               (str(request_id), actor, source, target, amount, kind, datetime.now(JST).isoformat()))
+               (str(request_id), actor, source, target, amount, kind, timestamp))
 
 
 def change(amount, *, actor, request_id, source=None, target=None, kind="transfer"):
     positive(amount)
     if source is None and target is None or source == target:
         raise ValueError("異なる転送元・転送先を指定してください。")
+    valid_direction = (
+        kind == 'grant' and source is None and target is not None or
+        kind == 'remove' and source is not None and target is None or
+        kind in ('transfer', 'donate') and source is not None and target is not None
+    )
+    if not valid_direction:
+        raise ValueError('操作種別と転送元・転送先の組み合わせが不正です。')
     with transaction() as db:
+        timestamp = datetime.now(JST).isoformat()
         if db.execute("SELECT 1 FROM wallet_ledger WHERE request_id=?", (str(request_id),)).fetchone():
             raise ValueError("この操作は処理済みです。")
         for uid in (source, target):
             if uid is not None:
                 ensure_user(db, uid)
         if source is not None:
-            updated = db.execute("UPDATE wallets SET balance=balance-? WHERE user_id=? AND balance>=?",
-                                 (amount, source, amount))
+            updated = db.execute("UPDATE wallets SET balance=balance-?,updated_at=? WHERE user_id=? AND balance>=?",
+                                 (amount, timestamp, source, amount))
             if not updated.rowcount:
                 raise ValueError("ジルコンの残高が不足しています。")
         if target is not None:
-            updated = db.execute("UPDATE wallets SET balance=balance+? WHERE user_id=? AND balance<=?",
-                                 (amount, target, MAX_AMOUNT - amount))
+            updated = db.execute("UPDATE wallets SET balance=balance+?,updated_at=? WHERE user_id=? AND balance<=?",
+                                 (amount, timestamp, target, MAX_AMOUNT - amount))
             if not updated.rowcount:
                 raise ValueError("転送先の残高が上限を超えます。")
-        audit(db, request_id, actor, source, target, amount, kind)
+        audit(db, request_id, actor, source, target, amount, kind, timestamp)
 
 
 def claim(uid, amount, excellent, request_id, now=None):
     positive(amount)
     limit = int(config.settings.get("mining_limit", 1))
     with transaction() as db:
+        if db.execute('SELECT 1 FROM wallet_ledger WHERE request_id=?', (str(request_id),)).fetchone():
+            raise ValueError('この操作は処理済みです。')
+        timestamp = datetime.now(JST).isoformat()
         period = current_period(now, db=db)
         ensure_user(db, uid)
         row = db.execute("SELECT period,count FROM mining_claims WHERE user_id=?", (uid,)).fetchone()
@@ -98,12 +109,12 @@ def claim(uid, amount, excellent, request_id, now=None):
                    (uid, effective_period, count + 1))
         updated = db.execute("""UPDATE wallets SET balance=balance+?,total_mined=total_mined+?,
             mining_count=mining_count+1,excellent_count=excellent_count+?,updated_at=? WHERE user_id=?
-            AND balance<=? AND total_mined<=?""",
-            (amount, amount, int(excellent), datetime.now(JST).isoformat(), uid,
-             MAX_AMOUNT - amount, MAX_AMOUNT - amount))
+            AND balance<=? AND total_mined<=? AND mining_count<? AND excellent_count<=?""",
+            (amount, amount, int(excellent), timestamp, uid,
+             MAX_AMOUNT - amount, MAX_AMOUNT - amount, MAX_AMOUNT, MAX_AMOUNT - int(excellent)))
         if not updated.rowcount:
             raise ValueError("残高が上限を超えます。")
-        audit(db, request_id, uid, None, uid, amount, "mine")
+        audit(db, request_id, uid, None, uid, amount, "mine", timestamp)
         return db.execute("SELECT balance FROM wallets WHERE user_id=?", (uid,)).fetchone()[0]
 
 

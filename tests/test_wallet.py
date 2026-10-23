@@ -57,6 +57,52 @@ class WalletTests(unittest.TestCase):
             self.grant()
         self.assertEqual(wallet.balance(100)[0], 20)
 
+    def test_all_balance_changes_update_timestamps_but_only_mining_increases_total_mined(self):
+        operations = [
+            lambda: self.grant(),
+            lambda: wallet.claim(100, 10, True, 'mine', self.now),
+            lambda: wallet.change(2, actor=999, request_id='transfer', source=100, target=200),
+            lambda: wallet.change(1, actor=100, request_id='donate', source=100, target=200, kind='donate'),
+            lambda: wallet.change(1, actor=999, request_id='remove', source=200, kind='remove'),
+        ]
+        for index, operation in enumerate(operations):
+            timestamp = self.now.replace(minute=index)
+            with patch.object(wallet, 'datetime', wraps=datetime) as clock:
+                clock.now.return_value = timestamp
+                operation()
+            with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+                source, target, recorded = db.execute(
+                    'SELECT source_id,target_id,created_at FROM wallet_ledger ORDER BY rowid DESC LIMIT 1').fetchone()
+                for uid in (source, target):
+                    if uid is not None:
+                        self.assertEqual(db.execute('SELECT updated_at FROM wallets WHERE user_id=?', (uid,)).fetchone()[0], recorded)
+                self.assertEqual(recorded, timestamp.isoformat())
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+            self.assertEqual(db.execute('SELECT total_mined FROM wallets ORDER BY user_id').fetchall(), [(10,), (0,)])
+
+    def test_duplicate_mining_request_rolls_back_quota_and_credit(self):
+        wallet.config.settings.set('mining_limit', 2)
+        wallet.claim(100, 1, False, 'same', self.now)
+        with self.assertRaisesRegex(ValueError, '処理済み'):
+            wallet.claim(100, 1, False, 'same', self.now)
+        wallet.claim(100, 1, False, 'second', self.now)
+        self.assertEqual(wallet.balance(100), (2, 2, 0))
+
+    def test_new_schema_has_no_reserved_country_user_ids(self):
+        self.grant(uid=1)
+        self.assertEqual(wallet.ranking('balance'), [(1, 20, 0, 0)])
+
+    def test_total_mined_overflow_rolls_back_claim_and_balance(self):
+        self.grant()
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db, db:
+            db.execute('UPDATE wallets SET total_mined=? WHERE user_id=100', (wallet.MAX_AMOUNT,))
+        with self.assertRaises(ValueError):
+            wallet.claim(100, 1, False, 'overflow', self.now)
+        self.assertEqual(wallet.balance(100), (20, 0, 0))
+        with closing(sqlite3.connect(wallet.config.DB_WALLET)) as db:
+            self.assertEqual(db.execute('SELECT * FROM mining_claims').fetchall(), [])
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM wallet_ledger').fetchone(), (1,))
+
     def test_invalid_amount_self_transfer_and_overflow(self):
         for amount in (0, -1, 1.5, True, 2**63):
             with self.assertRaises(ValueError):
