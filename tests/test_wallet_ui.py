@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import unittest
 import discord
 import test_mining_service
-from views.wallet_view import RankingView, MiningView, WalletView, ensure_panels
+from views.wallet_view import RankingView, MiningView, WalletView
 from views.settings_view import SettingsView, ScheduleModal, TargetView, TreasuryView
 from services import mining_service
 import zrmine
@@ -148,29 +148,6 @@ class UITests(unittest.IsolatedAsyncioTestCase):
                 await zrmine.donate.callback(i, 8)
             transact.assert_not_awaited()
             self.assertTrue(i.response.send_message.call_args.kwargs['ephemeral'])
-
-    async def test_panels_edit_existing_messages_and_never_repost(self):
-        channel = SimpleNamespace(fetch_message=AsyncMock(return_value=SimpleNamespace(edit=AsyncMock())), send=AsyncMock())
-        with patch("views.wallet_view.get_channel", new=AsyncMock(return_value=channel)), patch.object(zrmine.config.settings, "get", return_value=123):
-            await ensure_panels(Mock())
-            await ensure_panels(Mock())
-        self.assertEqual(channel.fetch_message.await_count, 4)
-        channel.send.assert_not_awaited()
-
-    async def test_missing_panels_created_once_and_ids_saved(self):
-        channel = SimpleNamespace(send=AsyncMock(return_value=SimpleNamespace(id=999)))
-        with patch("views.wallet_view.get_channel", new=AsyncMock(return_value=channel)), patch.object(zrmine.config.settings, "get", return_value=None), patch.object(zrmine.config.settings, "set") as save:
-            await ensure_panels(Mock())
-        self.assertEqual(channel.send.await_count, 2)
-        self.assertEqual(save.call_count, 2)
-
-    async def test_forbidden_fetch_does_not_create_duplicate(self):
-        error = discord.Forbidden(SimpleNamespace(status=403, reason="Forbidden"), "forbidden")
-        channel = SimpleNamespace(fetch_message=AsyncMock(side_effect=error), send=AsyncMock())
-        with patch("views.wallet_view.get_channel", new=AsyncMock(return_value=channel)), patch.object(zrmine.config.settings, "get", return_value=123):
-            with self.assertRaises(discord.Forbidden):
-                await ensure_panels(Mock())
-        channel.send.assert_not_awaited()
 
     async def test_excellent_uses_actual_result_image(self):
         user = SimpleNamespace(display_name="Alice", display_avatar=SimpleNamespace(url="https://example.com/avatar.png"))

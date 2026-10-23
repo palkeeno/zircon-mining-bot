@@ -3,7 +3,8 @@ import discord
 
 import config.config as config
 from config.role_manager import RoleProbabilityManager
-from views.wallet_view import SafeView, ensure_panels
+from views.wallet_view import SafeView
+from services.panel_service import ensure_panels
 from services.access import require_guild
 
 

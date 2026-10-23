@@ -11,7 +11,8 @@ from models import wallet
 from utils.backup import perform_backup, create_backup
 from services.access import require_guild
 from views.settings_view import SettingsView, summary
-from views.wallet_view import MiningView, WalletView, ensure_panels
+from views.wallet_view import MiningView, WalletView
+from services.panel_service import ensure_panels
 
 log = logging.getLogger(__name__)
 
@@ -135,7 +136,17 @@ async def on_ready():
         log.exception("常設投稿の確認に失敗しました。/settings から復旧できます。")
     if not schedule_backup.is_running():
         schedule_backup.start()
+    if not refresh_panels.is_running():
+        refresh_panels.start()
     log.info("Ready")
+
+
+@tasks.loop(seconds=5)
+async def refresh_panels():
+    try:
+        await ensure_panels(client, force=False)
+    except Exception:
+        log.exception("採掘パネルの更新に失敗しました。次の確認時に再試行します。")
 
 
 @tasks.loop(hours=24)

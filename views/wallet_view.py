@@ -1,16 +1,14 @@
-import asyncio
 import logging
 
 import discord
 
 import config.config as config
 from models import wallet
-from services.mining_service import mining_zircon, get_channel
+from services.mining_service import mining_zircon
 from utils.helpers import get_country
 from services.access import require_guild
 
 log = logging.getLogger(__name__)
-panel_lock = asyncio.Lock()
 
 
 class SafeView(discord.ui.View):
@@ -104,23 +102,3 @@ class WalletView(SafeView):
     async def excellents(self, interaction, button):
         await self.show_rank(interaction, "excellent")
 
-
-async def ensure_panels(client):
-    """Only create missing panels. Never repost at reset or reconnect."""
-    async with panel_lock:
-        channel = await get_channel(client, config.CHID_MINING)
-        for key, text, view in (
-            ("mining_message_id", "⛏️ ジルコン採掘所\n採掘ボタンからジルコンを獲得できます。", MiningView()),
-            ("wallet_message_id", "💎 保有数・ランキング\n結果は操作した本人にだけ表示されます。", WalletView()),
-        ):
-            message_id = config.settings.get(key)
-            if message_id:
-                try:
-                    message = await channel.fetch_message(int(message_id))
-                    await message.edit(content=text, view=view)
-                    continue
-                except discord.NotFound:
-                    pass
-                # Forbidden and network failures must not create duplicate messages.
-            message = await channel.send(content=text, view=view)
-            config.settings.set(key, message.id)

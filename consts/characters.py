@@ -208,10 +208,12 @@ CHARACTERS_MESSAGE = {
 
 import random
 
-def get_random_character():
+def get_random_character(exclude_id=None):
     # 全キャラの全セリフをキャラごとに展開し、重み付きランダムにする
     all_entries = []
     for char in CHARACTERS_LIST:
+        if char['id'] == exclude_id:
+            continue
         name = char["name"]
         cid = char["id"]
         for msg in CHARACTERS_MESSAGE[name]:
