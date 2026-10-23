@@ -97,7 +97,7 @@ def audit(db, request_id, actor, source, target, amount, kind):
 def change(amount, *, actor, request_id, source=None, target=None, kind="transfer"):
     positive(amount)
     if source is None and target is None or source == target:
-        raise ValueError("異なる送金元・送金先を指定してください。")
+        raise ValueError("異なる転送元・転送先を指定してください。")
     with transaction() as db:
         if db.execute("SELECT 1 FROM LEDGER WHERE request_id=?", (str(request_id),)).fetchone():
             raise ValueError("この操作は処理済みです。")
@@ -113,7 +113,7 @@ def change(amount, *, actor, request_id, source=None, target=None, kind="transfe
             updated = db.execute("UPDATE USERS SET curr_total=curr_total+? WHERE userid=? AND curr_total<=?",
                                  (amount, target, MAX_AMOUNT - amount))
             if not updated.rowcount:
-                raise ValueError("送金先の残高が上限を超えます。")
+                raise ValueError("転送先の残高が上限を超えます。")
         audit(db, request_id, actor, source, target, amount, kind)
 
 
