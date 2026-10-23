@@ -79,6 +79,46 @@ def register_commands(tree, service):
             f"{receipt.country}の国庫（<@{receipt.target}>）へ {receipt.amount:,} 💎 寄付しました。", ephemeral=True)
 
 
+    @tree.command(name='resetmining', description='全員の採掘回数を今すぐリセットします（残高・実績は維持）')
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @administrator()
+    async def resetmining(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await asyncio.to_thread(service.reset, actor=interaction.user.id, request_id=interaction.id)
+        except ValueError as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+            return
+        try:
+            await ensure_panels(interaction.client, force=False)
+        except Exception:
+            log.exception('Manual reset succeeded, but the panel refresh failed')
+            await interaction.followup.send('採掘回数をリセットしました。パネル更新は自動で再試行します。', ephemeral=True)
+            return
+        await interaction.followup.send('全員の採掘回数をリセットし、採掘パネルを更新しました。残高・実績は保持しています。', ephemeral=True)
+
+    @tree.command(name='exportwallet', description='walletデータベースをCSVでダウンロードします')
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @administrator()
+    async def exportwallet(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            files = await asyncio.to_thread(service.export, interaction.guild.filesize_limit)
+        except ValueError as error:
+            await interaction.followup.send(str(error), ephemeral=True)
+            return
+        with ExitStack() as stack:
+            attachments = []
+            for name, data in files:
+                stream = stack.enter_context(io.BytesIO(data))
+                attachment = discord.File(stream, filename=name)
+                stack.callback(attachment.close)
+                attachments.append(attachment)
+            await interaction.followup.send('walletデータベースのCSVです。Discord IDは文字列として読み込んでください。',
+                                            files=attachments, ephemeral=True)
+
     @tree.error
     async def command_error(interaction, error):
         if isinstance(error, app_commands.CheckFailure):
