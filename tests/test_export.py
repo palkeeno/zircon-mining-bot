@@ -15,34 +15,34 @@ class ExportTests(unittest.TestCase):
     grant = test_wallet.WalletTests.grant
 
     def test_only_selected_tables_are_exported_and_invalid_selections_are_rejected(self):
-        files = export_wallet(wallet.config.DB_USERS, ['RESET_LOG', 'USERS', 'USERS'])
-        self.assertEqual([name for name, _ in files], ['wallet_users.csv', 'wallet_reset_log.csv'])
-        for tables in ([], ['unknown'], ['USERS; DROP TABLE USERS']):
+        files = export_wallet(wallet.config.DB_WALLET, ['mining_resets', 'wallets', 'wallets'])
+        self.assertEqual([name for name, _ in files], ['wallets.csv', 'mining_resets.csv'])
+        for tables in ([], ['unknown'], ['wallets; DROP TABLE wallets']):
             with self.assertRaises(ValueError):
-                export_wallet(wallet.config.DB_USERS, tables)
+                export_wallet(wallet.config.DB_WALLET, tables)
 
     def test_csv_snapshot_includes_headers_history_and_no_wallet_mutation(self):
         self.grant()
         wallet.reset_claims(actor=999, request_id='reset', now=self.now)
-        before = Path(wallet.config.DB_USERS).read_bytes()
-        files = dict(export_wallet(wallet.config.DB_USERS))
+        before = Path(wallet.config.DB_WALLET).read_bytes()
+        files = dict(export_wallet(wallet.config.DB_WALLET))
         self.assertEqual(len(files), 5)
-        rows = list(csv.DictReader(io.StringIO(files['wallet_users.csv'].decode('utf-8-sig'))))
-        self.assertEqual(rows[0]['userid'], '100')
-        self.assertEqual(rows[0]['curr_total'], '20')
-        resets = list(csv.DictReader(io.StringIO(files['wallet_reset_log.csv'].decode('utf-8-sig'))))
-        self.assertEqual(resets[0]['actor'], '999')
-        self.assertEqual(Path(wallet.config.DB_USERS).read_bytes(), before)
+        rows = list(csv.DictReader(io.StringIO(files['wallets.csv'].decode('utf-8-sig'))))
+        self.assertEqual(rows[0]['user_id'], '100')
+        self.assertEqual(rows[0]['balance'], '20')
+        resets = list(csv.DictReader(io.StringIO(files['mining_resets.csv'].decode('utf-8-sig'))))
+        self.assertEqual(resets[0]['actor_id'], '999')
+        self.assertEqual(Path(wallet.config.DB_WALLET).read_bytes(), before)
 
 
 class ExportPackagingTests(unittest.TestCase):
     def test_direct_csv_zip_fallback_and_size_error(self):
-        files = [('wallet_users.csv', b'a' * 10000)]
+        files = [('wallets.csv', b'a' * 10000)]
         self.assertEqual(package_exports(files, 20000), files)
         name, data = package_exports(files, 1000)[0]
         self.assertEqual(name, 'wallet_csv.zip')
         with ZipFile(io.BytesIO(data)) as archive:
-            self.assertEqual(archive.read('wallet_users.csv'), files[0][1])
+            self.assertEqual(archive.read('wallets.csv'), files[0][1])
         with self.assertRaises(ValueError):
             package_exports(files, 1)
 

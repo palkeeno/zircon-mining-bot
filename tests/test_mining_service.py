@@ -25,7 +25,7 @@ except ModuleNotFoundError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_DEFAULTS = {
     "DISCORD_TOKEN": "test-token",
-    "DB_USERS": "test-users.db",
+    "DB_WALLET": "test-users.db",
     "CWD": str(PROJECT_ROOT),
     "MCH": "1",
     "CHID_MINING": "2",

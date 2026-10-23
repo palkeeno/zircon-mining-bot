@@ -6,7 +6,7 @@ from contextlib import closing
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
-TABLES = ('USERS', 'CLAIMS', 'LEDGER', 'WALLET_META', 'RESET_LOG')
+TABLES = ('wallets', 'mining_claims', 'wallet_ledger', 'mining_state', 'mining_resets')
 
 
 def csv_value(value):
@@ -32,7 +32,7 @@ def export_wallet(database, tables=TABLES):
             writer.writerow([column[0] for column in cursor.description])
             for row in cursor:
                 writer.writerow([csv_value(value) for value in row])
-            files.append((f'wallet_{table.lower()}.csv', output.getvalue().encode('utf-8-sig')))
+            files.append((f'{table}.csv', output.getvalue().encode('utf-8-sig')))
     return files
 
 
