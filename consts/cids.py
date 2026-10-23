@@ -1,6 +1,0 @@
-MINING_ZIRCON = "mining_zircon"
-SELF_STATS = "self_stats"
-COUNTRY_STATS = "country_stats"
-RANK_COUNTRY = "rank_countries"
-OUTPUT_RANK = "output_rank"
-MINE_STATUS = "mine_status"

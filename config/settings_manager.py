@@ -1,12 +1,13 @@
 import json
 import os
+from pathlib import Path
 from typing import List, Dict, Any
 
 class SettingsManager:
     """設定値を管理するクラス"""
     
-    def __init__(self, settings_file: str = "data/user_setting.json"):
-        self.settings_file = settings_file
+    def __init__(self, settings_file=None):
+        self.settings_file = str(settings_file or os.getenv("SETTINGS_FILE") or Path(__file__).resolve().parent.parent / "data/user_setting.json")
         self._settings = {}
         self.load_settings()
     
@@ -30,28 +31,15 @@ class SettingsManager:
                 }
                 self.save_settings()
         except Exception as e:
-            print(f"設定ファイルの読み込みエラー: {e}")
-            # エラー時はデフォルト設定を使用
-            self._settings = {
-                "mine_open": True,
-                "announce_hour": [0, 12],
-                "announce_minute": [0],
-                "probability": [
-                    {"id": 0, "msg": "Excellent", "prob": 0.03, "zirnum": 10},
-                    {"id": 1, "msg": "Great", "prob": 0.25, "zirnum": 3},
-                    {"id": 2, "msg": "Good", "prob": 1, "zirnum": 1}
-                ]
-            }
-    
+            raise RuntimeError(f"設定ファイルを読み込めません: {self.settings_file}") from e
+
     def save_settings(self):
         """設定値をファイルに保存する"""
-        try:
-            # ディレクトリが存在しない場合は作成
-            os.makedirs(os.path.dirname(self.settings_file), exist_ok=True)
-            with open(self.settings_file, 'w', encoding='utf-8') as f:
-                json.dump(self._settings, f, ensure_ascii=False, indent=4)
-        except Exception as e:
-            print(f"設定ファイルの保存エラー: {e}")
+        os.makedirs(os.path.dirname(os.path.abspath(self.settings_file)), exist_ok=True)
+        temporary = self.settings_file + ".tmp"
+        with open(temporary, 'w', encoding='utf-8') as f:
+            json.dump(self._settings, f, ensure_ascii=False, indent=4)
+        os.replace(temporary, self.settings_file)
     
     def get(self, key: str, default=None):
         """設定値を取得する"""
@@ -59,8 +47,17 @@ class SettingsManager:
     
     def set(self, key: str, value: Any):
         """設定値を設定し、ファイルに保存する"""
-        self._settings[key] = value
-        self.save_settings()
+        self.update({key: value})
+
+    def update(self, values):
+        self.load_settings()
+        previous = self._settings.copy()
+        self._settings.update(values)
+        try:
+            self.save_settings()
+        except Exception:
+            self._settings = previous
+            raise
     
     def get_mine_open(self) -> bool:
         """鉱山の営業状況を取得（毎回ファイル再読込）"""

@@ -1,219 +1,103 @@
-# Zircon Mining Bot - Discord Bot
+# Zircon Mining Bot
 
-Discord サーバー用の採掘ゲームボットです。ユーザーは国に所属してジルコンを採掘し、ランキングを競うことができます。
+Discordで常設の採掘ボタンを押し、個人のログインポイントとして💎ジルコンを獲得するBotです。
 
-## リポジトリ名と配置先
+## 使い方
 
-リポジトリは `palkeeno/zircon-mining-bot` です。
+採掘チャンネルには次の2投稿を常設します。
 
-```bash
-git clone https://github.com/palkeeno/zircon-mining-bot.git
-cd zircon-mining-bot
-```
+- 採掘所：キャラクターの名前・セリフ・アイコン・サムネイルと採掘ボタン
+- 保有数・ランキング：自分の保有数、ジルコン所持数ランキング、Excellentランキング
 
-既存チェックアウトでは、取得先を更新します。
+結果はすべてエフェメラル（本人のみ表示）です。ランキングは10件ずつ前後に移動できます。所持数ランキングは現在の残高・名前・所属国の絵文字、Excellentランキングは名前・Excellent回数・採掘回数を表示します。所属国がない場合は「—」、取得できないユーザーはIDを表示します。
 
-```bash
-git remote set-url origin https://github.com/palkeeno/zircon-mining-bot.git
-```
-
-リポジトリ名と本番の配置先は別です。既存の `/home/zircon-mining`、cron、DB、環境設定はそのまま使用します。起動ファイルは引き続き `zrmine.py` です。配置先を変更する場合は、Botを停止したうえで `CWD`、DB・画像のパス、cronやサービスのパス、仮想環境を確認してください。
-
-## プロジェクト構造
-
-```
-zircon-mining-bot/
-├── zrmine.py                    # メインエントリーポイント
-├── config/                      # 設定関連
-│   ├── config.py               # 環境変数・定数設定
-│   ├── settings_manager.py     # 動的設定管理
-│   └── role_manager.py         # ロール確率管理
-├── utils/                      # ユーティリティ
-│   ├── helpers.py              # 汎用ヘルパー関数
-│   ├── backup.py               # バックアップ機能
-│   └── db_utils.py             # データベース操作
-├── models/                     # データベースモデル
-│   ├── mining.py               # 採掘DBモデル
-│   └── users.py                # ユーザーDBモデル
-├── services/                   # ビジネスロジック
-│   ├── embeds.py               # Discord Embed生成
-│   ├── mining_service.py       # 採掘処理ロジック
-│   └── stats_service.py        # 統計・ランキング処理
-├── views/                      # Discord UI Views
-│   ├── mine_status_view.py     # 鉱山営業状況UI
-│   ├── rank_view.py            # ランキング表示UI
-│   └── reset_confirm_view.py   # リセット確認UI
-├── consts/                     # 定数定義
-│   ├── characters.py           # キャラクター情報
-│   ├── cids.py                 # カスタムID定数
-│   ├── const.py                # 共通定数
-│   └── sysmsg.py               # システムメッセージ
-├── data/                       # 設定データ
-│   ├── role_probabilities.json # ロール別確率設定
-│   └── user_setting.json       # ユーザー設定
-├── assets/                     # 画像アセット
-├── assets_character/           # キャラクター画像
-├── backups/                    # DBバックアップ（gitignore済み）
-├── mining.db                   # 採掘データベース（gitignore済み）
-└── users.db                    # ユーザーデータベース（gitignore済み）
-```
-
-## 機能
-
-### ユーザー機能
-- **採掘システム**: ボタンを押してジルコンを採掘
-- **統計表示**: 個人の採掘統計とランキング表示
-- **国別統計**: 所属国の採掘統計とランキング表示
-
-### 管理者機能
-- **鉱山営業管理**: 鉱山の開閉状態を管理
-- **ジルコン付与**: 指定ユーザーにジルコンを付与
-- **メッセージ投稿**: 採掘チャンネルにメッセージを投稿
-- **アナウンス送信**: 採掘アナウンスを手動送信
-- **データベースリセット**: 採掘データのリセット
-- **時間設定**: 採掘アナウンス時間の設定
-- **確率設定**: 採掘確率とジルコン数の設定
-- **ロール確率設定**: ロール別採掘確率の設定
-
-## セットアップ
-
-### 必要な環境
-- Python 3.8+
-- Discord Bot Token
-
-### インストール
-```bash
-pip install -r requirements.txt
-```
-
-### 環境変数設定
-`.env.development` または `.env.production` ファイルを作成し、以下の変数を設定：
-
-```env
-DISCORD_TOKEN=your_discord_bot_token
-DB_MINING=mining.db
-DB_USERS=users.db
-CWD=/path/to/project
-MCH=management_channel_id
-CHID_MINING=mining_channel_id
-BRAVE_CHAT=brave_chat_channel_id
-FREEDOM_CHAT=freedom_chat_channel_id
-GLORY_CHAT=glory_chat_channel_id
-PEACEFUL_CHAT=peaceful_chat_channel_id
-MINING_EXCELLENT_CHAT=unaffiliated_user_excellent_channel_id
-BRAVE_ROLE=brave_role_id
-FREEDOM_ROLE=freedom_role_id
-GLORY_ROLE=glory_role_id
-PEACEFUL_ROLE=peaceful_role_id
-BRAVE_EMOJI=brave_emoji
-FREEDOM_EMOJI=freedom_emoji
-GLORY_EMOJI=glory_emoji
-PEACEFUL_EMOJI=peaceful_emoji
-```
-
-`MINING_EXCELLENT_CHAT` は、国に所属していないユーザーがExcellentを出したときの投稿先です。
-
-### 実行
-```bash
-python zrmine.py
-```
-
-本番設定を使って直接起動する場合は、`ENV=production` を明示します。
-
-```bash
-ENV=production python zrmine.py
-```
-
-### 本番環境での監視起動
-
-本番環境では、cronから直接Pythonを起動せず、監視スクリプトを使用します。
-監視スクリプトはプロジェクトディレクトリへ移動し、`ENV=production`、非バッファリング出力、PID管理を設定して起動します。
-
-```cron
-* * * * * /bin/bash /home/zircon-mining/scripts/checkps.sh
-```
-
-cronへ登録する前に、production設定と実行ファイルを検証できます。この確認ではBotを起動しません。
-
-```bash
-/bin/bash /home/zircon-mining/scripts/checkps.sh --check
-```
-
-標準の配置先は以下です。
-
-- Botログ: `/home/zircon-mining/nohup.out`
-- 監視ログ: `/home/zircon-mining/log/checkps.log`
-- PID・ロックファイル: `/home/zircon-mining/run/`
-
-Pythonやログの場所を変更する場合は、`ZIRCON_PYTHON_BIN`、`ZIRCON_APP_LOG`、`ZIRCON_WATCHDOG_LOG`をcron側で指定できます。
+採掘権は個人単位です。国別の採掘済みフラグや国別集計は使用せず、国ロール変更で追加採掘はできません。国ロールは所属表示・Excellent通知先・寄付先国庫の判定に使います。Excellent通知の複数国所属時の選択順は従来通りです。通知には、採掘した本人に表示した結果画像と同じファイルをサムネイルとして添付します。
 
 ## コマンド
 
-### 管理者コマンド
-- `/zmst` - 鉱山の営業状況を表示・変更
-- `/zmrank` - ランキング情報を表示
-- `/zmadd <amount> <user>` - 指定ユーザーにジルコンを付与
-- `/zmmsg <message>` - 採掘チャンネルにメッセージを投稿
-- `/zmannounce` - 採掘アナウンスを手動送信
-- `/zmreset <mining/all>` - データベースをリセット
-- `/zmtime [hours] [minutes]` - 採掘時間を設定
-- `/zmprob [id] [prob] [zirnum]` - 採掘確率とジルコン数を設定
-- `/zmrole [ロール名] [Great確率] [Excellent確率] [優先度]` - ロール別採掘確率を設定
-- `/zmhelp` - ヘルプを表示
+| コマンド | 権限 | 用途 |
+| --- | --- | --- |
+| `/settings` | Administrator | 設定ビューを開く |
+| `/add user amount` | Administrator | 残高を付与 |
+| `/remove user amount` | Administrator | 残高を引き去る |
+| `/transfer source target amount` | Administrator | 任意のユーザー間で転送 |
+| `/resetmining` | Administrator | 全員の採掘回数を即時リセット（残高・実績は維持） |
+| `/exportwallet` | Administrator | 必要な情報を複数選択してCSVで取得 |
+| `/donate amount` | 一般ユーザー | 自分の所属国の国庫へ自動で寄付 |
 
-## データベース
+管理チャンネルにいるだけでは管理操作できません。設定ビュー・選択メニュー・入力フォームでも権限を再確認します。すべての操作は採掘チャンネルが属するサーバーに限定します。
 
-### 採掘データベース (mining.db)
-- ユーザーごとの採掘記録
-- 国別の採掘統計
-- 採掘済みフラグ管理
+設定ビューでは開閉、リセットの時・分、リセット間の採掘回数、採掘可能ロール、寄付先、未所属Excellent通知先、共通確率・獲得数、ロール別確率を確認・変更できます。常設投稿が削除された場合の復旧ボタンもあります。
 
-### ユーザーデータベース (users.db)
-- ユーザーの生涯採掘統計
-- 累積採掘量と回数
-- Excellent回数の記録
+国庫はBrave / Freedom / Glory / Peacefulの国ロールに1対1で対応する4アカウントです。「4か国の国庫」から国ごとに設定します。同一アカウントの重複登録は拒否します。未所属・複数国所属・所属国の国庫未設定時は寄付できません。寄付時に任意ユーザーや他国の国庫を指定することはできません。
 
-## バックアップ
+旧設定コマンド（`/zmst`、`/zmtime`、`/zmprob`、`/zmrole` など）は設定ビューへ統合しました。旧イベントDBリセット・国ランキング・任意メッセージ投稿コマンドは新バージョンでは登録しません。
 
-- 24時間ごとに自動バックアップが実行されます
-- バックアップファイルは `backups/` フォルダに保存されます
-- 古いバックアップは自動的に削除されます
+## セットアップ
 
-## 開発
+Python 3.11または3.12を推奨します。
 
-### リポジトリ名と配置先
-
-リポジトリは `palkeeno/zircon-mining-bot` です。
-
-```bash
+```sh
 git clone https://github.com/palkeeno/zircon-mining-bot.git
 cd zircon-mining-bot
+python -m venv .venv
+# 仮想環境を有効にして実行
+python -m pip install -r requirements.txt
 ```
 
-既存チェックアウトでは、取得先を更新します。
+`.env.example` を参考に `.env.production` または `.env.development` を設定します。既存の環境変数とDBパスは引き継ぎます。
 
-```bash
-git remote set-url origin https://github.com/palkeeno/zircon-mining-bot.git
+- `CHID_MINING`：採掘・保有数の常設投稿先
+- `MINING_ROLE`：採掘可能ロールの初期値
+- `MINING_EXCELLENT_CHAT`：未所属者のExcellent通知先初期値
+- `BRAVE_TREASURY_USER_ID` / `FREEDOM_TREASURY_USER_ID` / `GLORY_TREASURY_USER_ID` / `PEACEFUL_TREASURY_USER_ID`：各国の国庫アカウント初期値。省略時は暫定値 `0`（その国への寄付を無効化）
+- 各国の `*_ROLE` / `*_CHAT` / `*_EMOJI`：所属判定・国別Excellent通知・所属表示
+- `DB_USERS`：個人残高・採掘権・取引履歴DB
+- `DB_MINING`：旧採掘DB。移行時の読み取りとバックアップ用
+- `CWD`：既存のアプリ配置先
+- `GUILD_ID`：指定時はこのサーバーだけにコマンドを同期し、採掘チャンネルの所属を検証。省略・0は従来のグローバル同期
+- `SETTINGS_FILE` / `ROLE_SETTINGS_FILE` / `BACKUP_DIR`：環境別の設定・ロール確率・バックアップ保存先
+
+設定ビューで保存した値は `data/user_setting.json` に永続化され、環境変数の初期値より優先します。ロール別確率は既存の `data/role_probabilities.json` を使います。
+
+テスト環境ではDB2種と上記3つの保存先をすべて分離してください。`GUILD_ID` を設定した起動では既存グローバルコマンドを変更・削除しません。過去のグローバル登録が残るテストBotでは候補が重複する場合があります。
+
+Developer Portalの **Server Members Intent** を有効にしてください。Botには投稿先の閲覧・履歴閲覧・メッセージ送信・埋め込み・ファイル添付権限が必要です。
+
+```sh
+ENV=production python zrmine.py
 ```
 
-リポジトリ名と本番の配置先は別です。既存の `/home/zircon-mining`、cron、DB、環境設定はそのまま使用します。起動ファイルは引き続き `zrmine.py` です。配置先を変更する場合は、Botを停止したうえで `CWD`、DB・画像のパス、cronやサービスのパス、仮想環境を確認してください。
+本番配置先 `/home/zircon-mining`、cronの `scripts/checkps.sh`、起動ファイル `zrmine.py` は変更しません。
 
-## プロジェクト構造の説明
-- **config/**: 設定関連のファイルを集約
-- **utils/**: 汎用ユーティリティとシステム機能
-- **models/**: データベースモデルとデータアクセス層
-- **services/**: ビジネスロジックとDiscord関連サービス
-- **views/**: Discord UIコンポーネント
-- **consts/**: 定数定義とシステムメッセージ
+```sh
+/bin/bash /home/zircon-mining/scripts/checkps.sh --check
+```
 
-### 新機能追加時の指針
-- 設定関連 → `config/`
-- 汎用ユーティリティ → `utils/`
-- データベース操作 → `models/`
-- ビジネスロジック → `services/`
-- Discord UI → `views/`
-- 定数・メッセージ → `consts/`
+## データとリセット
 
-## ライセンス
+既存の `USERS.curr_total` を残高として維持し、採掘時だけ生涯採掘量・回数・Excellent回数を増やします。管理者操作と寄付は採掘実績に加算しません。旧バージョンで既に加算された実績は推測で補正しません。
 
-このプロジェクトはMITライセンスの下で公開されています。
+リセット時刻は日本時間の「時 × 分」の組み合わせです。例：時 `0,12`、分 `0` は1日2回、時 `0,12`、分 `0,30` は1日4回。各期間の採掘回数は既定1回、1〜100回で設定できます。未使用分は次期間へ繰り越しません。CLOSE中も時間は進み、OPEN時には現在の期間が適用されます。時刻変更は直ちに適用され、最新の境界が変わる場合は新期間になります。
+
+5秒ごとに期間境界を確認し、リセット後は同じ採掘投稿の演出embedを別のランダムなキャラへ書き換えます。`consts/characters.py` のセリフと既存のキャラ画像を使い、アイコンとサムネイルに同じ画像を表示します。期間内の再起動・更新失敗の再試行では選択したキャラを維持します。停止中の境界をすべて再生せず、復帰時の現在期間へ更新します。
+
+投稿し直す定時処理はありません。採掘時に最新の期間境界を判定するため、Botがリセット時刻に停止していても次の採掘から正常に処理します。常設投稿のIDを保存し、再起動時は既存投稿を編集します。投稿が削除されていたときだけ再作成します。403や通信エラーでは重複投稿を作りません。
+
+残高、採掘権、取引履歴は1つのSQLiteトランザクションで更新し、二重実行、同時採掘、残高不足、自己転送、非正整数、上限超過を防ぎます。履歴にはDiscord操作ID・実行者・転送元・転送先・数量・種類・日時を保存します。
+
+`/resetmining` は全員の採掘権を回復し、新しい期間境界を永続化します。定時スケジュール・OPEN/CLOSE・残高・実績は変えません。次の定時境界から通常の期間に戻ります。操作IDと実行者を `RESET_LOG` に記録し、同じ操作の二重実行を防ぎます。既存DBは再作成せず、起動時に必要なテーブルを追加します。
+
+`/exportwallet` は本人限定の日本語の複数選択メニューを開きます。必要な情報を1〜5種類選び、「選択した情報をダウンロード」を押すと、選択したテーブルだけを1つの読み取りスナップショットから `USERS`、`CLAIMS`、`LEDGER`、`WALLET_META`、`RESET_LOG` のうち選んだものをUTF-8 BOM付きCSVにして本人限定で返します。添付上限を超えるCSVがあればZIP化し、それでも超える場合はエラーを返します。Discord IDは表計算ソフトで文字列として読み込んでください。CSVからの復元機能は含みません。
+
+設計の選定理由と依存関係は [アーキテクチャ](docs/ARCHITECTURE.md) を参照してください。
+
+## 検証
+
+```sh
+python -m unittest discover -s tests -v
+python -m compileall -q commands domain config models services views utils zrmine.py
+git diff --check
+```
+
+GitHub ActionsはWindows / Ubuntu、Python 3.11 / 3.12で実行します。移行と本番確認手順は [管理者マニュアル](docs/ADMIN_MANUAL.md) を参照してください。

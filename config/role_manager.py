@@ -5,7 +5,7 @@ from datetime import datetime
 class RoleProbabilityManager:
     def __init__(self):
         self.cache = []
-        self.file_path = "data/role_probabilities.json"
+        self.file_path = os.getenv("ROLE_SETTINGS_FILE", "data/role_probabilities.json")
         self.load()
     
     def load(self):
@@ -22,7 +22,7 @@ class RoleProbabilityManager:
     def save(self):
         """キャッシュをファイルに保存"""
         # ディレクトリが存在しない場合は作成
-        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        os.makedirs(os.path.dirname(os.path.abspath(self.file_path)), exist_ok=True)
         data = {'role_probabilities': self.cache}
         with open(self.file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)

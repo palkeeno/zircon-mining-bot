@@ -12,10 +12,10 @@ ENV_FILE = ".env.production" if ENV == "production" else ".env.development"
 load_dotenv(PROJECT_ROOT / ENV_FILE)
 
 # 設定マネージャーのインポート
-from config.settings_manager import SettingsManager
+from config.settings_manager import settings_manager
 
 # 設定マネージャーのインスタンスを作成
-settings = SettingsManager()
+settings = settings_manager
 
 #### Load Env (Sensitive Information) ####
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -41,6 +41,38 @@ GLORY_ROLE = int(os.getenv("GLORY_ROLE"))
 PEACEFUL_ROLE = int(os.getenv("PEACEFUL_ROLE"))
 # 採掘ロール
 MINING_ROLE = int(os.getenv("MINING_ROLE"))
+TREASURY_USER_IDS = {
+    str(i): int(os.getenv(f"{name}_TREASURY_USER_ID", "0"))
+    for i, name in enumerate(("BRAVE", "FREEDOM", "GLORY", "PEACEFUL"), 1)
+}
+GUILD_ID = int(os.getenv("GUILD_ID", "0"))
+BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
+
+
+def get_mining_role():
+    return int(settings.get("mining_role", MINING_ROLE))
+
+
+def get_treasury_user_id(country_id):
+    key = str(country_id)
+    if key not in TREASURY_USER_IDS:
+        raise ValueError("国を選択してください。")
+    return int(settings.get("treasury_user_ids", {}).get(key, TREASURY_USER_IDS[key]))
+
+
+def set_treasury_user_id(country_id, user_id):
+    settings.load_settings()
+    key = str(country_id)
+    get_treasury_user_id(key)  # Reject unknown countries before saving.
+    if user_id and any(get_treasury_user_id(other) == user_id for other in TREASURY_USER_IDS if other != key):
+        raise ValueError("このアカウントは別の国の国庫です。国ごとに異なるアカウントを指定してください。")
+    values = dict(settings.get("treasury_user_ids", {}))
+    values[key] = user_id
+    settings.set("treasury_user_ids", values)
+
+
+def get_excellent_chat():
+    return int(settings.get("excellent_chat", MINING_EXCELLENT_CHAT))
 
 # Emojis
 BRAVE_EMOJI = os.getenv("BRAVE_EMOJI")

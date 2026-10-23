@@ -1,5 +1,1 @@
-from .mine_status_view import MineStatusView
-from .rank_view import RankView
-from .reset_confirm_view import ResetConfirmView
-
-__all__ = ['MineStatusView', 'RankView', 'ResetConfirmView'] 
+"""Discord views for permanent mining, wallet and administrator settings."""

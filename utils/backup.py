@@ -1,9 +1,10 @@
 import os
-import shutil
+import sqlite3
+from contextlib import closing
 import datetime
 from typing import List
 import config.config as config
-from consts.const import JST
+from domain.mining_period import JST
 
 def create_backup() -> List[str]:
     """データベースのバックアップを作成する
@@ -11,18 +12,19 @@ def create_backup() -> List[str]:
     Returns:
         List[str]: バックアップファイルのパスリスト
     """
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
-    timestamp = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.datetime.now(JST).strftime("%Y%m%d_%H%M%S_%f")
     backup_files = []
 
     # 各データベースファイルのバックアップを作成
     for db_path in [config.DB_MINING, config.DB_USERS]:
         if os.path.exists(db_path):
             backup_path = os.path.join(backup_dir, f"{os.path.basename(db_path)}_{timestamp}")
-            shutil.copy2(db_path, backup_path)
+            with closing(sqlite3.connect(db_path)) as source, closing(sqlite3.connect(backup_path)) as destination:
+                source.backup(destination)
             backup_files.append(backup_path)
 
     return backup_files
@@ -33,7 +35,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
     Args:
         days_to_keep (int): 保持する日数
     """
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     if not os.path.exists(backup_dir):
         return
 
@@ -50,7 +52,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
 
 def cleanup_excess_backups(max_files: int = 10) -> None:
     """各DBごとにバックアップファイルがmax_files個を超えていたら古いものから削除する"""
-    backup_dir = "backups"
+    backup_dir = config.BACKUP_DIR
     for db_name in [os.path.basename(config.DB_MINING), os.path.basename(config.DB_USERS)]:
         prefix = db_name + "_"
         db_backups = [f for f in os.listdir(backup_dir) if f.startswith(prefix)]
