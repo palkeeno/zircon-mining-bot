@@ -32,7 +32,7 @@
 
 依存は基本的にコマンド／ビュー → サービス → SQLiteゲートウェイ → 純粋な期間計算へ流れる。サービスは設定とゲートウェイを受け取る。SQLトランザクション境界はゲートウェイ側に残し、サービスから複数の独立更新を呼んで残高と履歴を分離しない。設定UIや描画サービスにはDiscord依存があり、完全なHexagonal Architectureではない。
 
-定時更新は期間が変わった場合だけHTTP編集する。キャラ選択は通信前に保存し、更新完了の期間は通信後に保存するため、失敗後も同じキャラで再試行できる。手動リセットはDB内で完了させ、その後のパネル更新失敗で二重リセットしない。採掘側は期間判定も更新トランザクション内で実行する。
+定時更新は期間またはアセットの操作履歴番号が変わった場合だけHTTP編集する。キャラ選択は通信前に保存し、更新完了の期間は通信後に保存するため、失敗後も同じキャラで再試行できる。手動リセットはDB内で完了させ、その後のパネル更新失敗で二重リセットしない。採掘側は期間判定も更新トランザクション内で実行する。
 
 旧イベント採掘・国別統計・旧リセット画面など、現仕様から参照されないコードを削除した。既存DBや利用者の設定ファイルは削除しない。
 
@@ -47,3 +47,11 @@
 - Martin Fowler: [Repository](https://martinfowler.com/eaaCatalog/repository.html)
 - Martin Fowler: [Table Data Gateway](https://martinfowler.com/eaaCatalog/tableDataGateway.html)
 - Alistair Cockburn: [Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture)
+
+## アセットの境界
+
+`commands/asset_commands.py` と `views/assets_view.py` は管理者本人限定の入出力を担当し、`services/asset_catalog.py` が画像検証、SQL、初回取り込み、セリフ抽選、バックアップをまとめる。現規模ではサービスとSQLiteゲートウェイを同じクラスに置き、ORMやRepository階層は追加しない。ウォレットとは別DBで、画像変更が残高処理のスキーマへ影響しない。
+
+画像はランダムなファイル名で不変ファイルとして保存し、DBの参照をトランザクションで差し替える。更新にはrevisionを要求して古い画面からの上書きを防ぐ。画像参照の読み取り期間はファイル内容をbytesへ読み終えるまで保持する。採掘開始時に演出と結果画像のbytesを確定し、途中の差し替え・削除がその採掘やExcellent通知に影響しない。`services/asset_delivery.py` がDiscord添付とストリームの解放を扱う。
+
+非表示は抽選から除外し、完全削除はDB行とキャラのセリフを消す。履歴に削除内容そのものを残さず、操作種別・対象ID・実行者・時刻だけを保持する。古いバックアップや既存Discord投稿は別の保存物として残る。アセットZIPは読み取り期間を保持してDBと参照画像を取得し、未参照ファイルを含めない。
