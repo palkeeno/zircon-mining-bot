@@ -57,6 +57,7 @@ class EnvironmentTests(unittest.TestCase):
                 connection.execute('CREATE TABLE evidence(value INTEGER)')
                 connection.execute('INSERT INTO evidence VALUES(42)')
             with patch.object(backup.config, 'DB_WALLET', str(database)), \
+                 patch.object(backup.config, 'ASSET_DATA_DIR', str(root / 'absent-assets')), \
                  patch.object(backup.config, 'BACKUP_DIR', str(root / 'backups')):
                 files = backup.perform_backup()
             self.assertEqual(len(files), 1)
@@ -83,6 +84,7 @@ class GuildStartupTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(zrmine.config, 'GUILD_ID', 111), \
              patch.object(zrmine, 'create_backup'), \
              patch.object(zrmine.wallet, 'initialize'), \
+             patch.object(zrmine.asset_catalog, 'initialize'), \
              patch.object(zrmine.tree, 'copy_global_to') as copy, \
              patch.object(zrmine.tree, 'sync', new=AsyncMock()) as sync:
             await zrmine.MiningClient.setup_hook(client)

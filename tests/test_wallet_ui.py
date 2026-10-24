@@ -7,6 +7,7 @@ from views.wallet_view import RankingView, MiningView, WalletView
 from views.settings_view import SettingsView, ScheduleModal, TargetView, TreasuryView
 from services import mining_service
 import zrmine
+from services.asset_catalog import Media
 
 
 def interaction(admin=False):
@@ -14,7 +15,7 @@ def interaction(admin=False):
         id=12345, guild=SimpleNamespace(id=789, get_member=Mock(return_value=None)),
         client=SimpleNamespace(mining_guild_id=789),
         user=SimpleNamespace(id=100, roles=[], guild_permissions=SimpleNamespace(administrator=admin)),
-        response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock(), is_done=Mock(return_value=False)),
+        response=SimpleNamespace(send_message=AsyncMock(), send_modal=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock(), is_done=Mock(return_value=False)),
         followup=SimpleNamespace(send=AsyncMock()),
     )
 
@@ -63,6 +64,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
              patch.object(mining_service, "has_mining_role", return_value=True), \
              patch.object(mining_service, "gacha", return_value={"id": 0, "msg": "Excellent", "zirnum": 10}), \
              patch.object(mining_service.wallet_service, "claim", return_value=42) as claim, \
+             patch.object(mining_service.asset_catalog, 'choose_media', side_effect=lambda kind: Media(kind,kind,kind+'.png',b'picture')), \
              patch.object(mining_service.asyncio, "sleep", new=AsyncMock()), \
              patch.object(mining_service, "send_excellent_notification", new=AsyncMock()) as notify:
             await mining_service.mining_zircon(i, i.client)
@@ -73,7 +75,8 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         filename = result["attachments"][0].filename
         self.assertEqual(result["embed"].image.url, f"attachment://{filename}")
         self.assertIn("42", result["embed"].fields[0].value)
-        notify.assert_awaited_once_with(i.client, i.user, None, filename)
+        self.assertEqual(notify.call_args.args[3].filename, filename)
+        self.assertEqual(notify.call_args.args[3].data, b'picture')
         # Mocked HTTP calls do not close upload files automatically.
         result["attachments"][0].close()
         i.followup.send.call_args.kwargs["file"].close()
@@ -152,7 +155,7 @@ class UITests(unittest.IsolatedAsyncioTestCase):
         user = SimpleNamespace(display_name="Alice", display_avatar=SimpleNamespace(url="https://example.com/avatar.png"))
         channel = SimpleNamespace(send=AsyncMock())
         with patch.object(mining_service, "get_channel", new=AsyncMock(return_value=channel)), patch.object(mining_service.discord, "File") as file:
-            await mining_service.send_excellent_notification(Mock(), user, None, "Excellent2.png")
+            await mining_service.send_excellent_notification(Mock(), user, None, Media("result", "result", "Excellent2.png", b"picture"))
         self.assertEqual(file.call_args.kwargs["filename"], "Excellent2.png")
         self.assertEqual(channel.send.call_args.kwargs["embed"].thumbnail.url, "attachment://Excellent2.png")
 

@@ -8,7 +8,8 @@ import discord
 import emoji
 import test_mining_service
 from config.settings_manager import SettingsManager
-from consts.characters import CHARACTERS_LIST, get_random_character
+from services.asset_catalog import Media
+import test_assets
 from services import panel_service as panels
 
 
@@ -16,6 +17,10 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
+        fixture = test_assets.AssetTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        self.catalog = fixture.catalog
         self.settings = SettingsManager(Path(temporary.name) / 'settings.json')
         self.settings.update({'mining_message_id': 100, 'wallet_message_id': 200})
         self.message = SimpleNamespace(id=100, edit=AsyncMock())
@@ -23,6 +28,7 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
                                        send=AsyncMock(return_value=self.message))
         for target, attr, value in (
             (panels.config, 'settings', self.settings),
+            (panels, 'asset_catalog', self.catalog),
             (panels.wallet_service, 'current_period', Mock(return_value='2026-10-23T12:00:00+09:00')),
             (panels, 'get_channel', AsyncMock(return_value=self.channel)),
         ):
@@ -65,11 +71,18 @@ class PanelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.settings.get('mining_panel_character'), first)
 
     def test_embed_uses_character_name_dialogue_and_same_image_for_both_slots(self):
-        for character in CHARACTERS_LIST:
-            self.assertTrue((Path(panels.config.CWD) / 'assets_character' / f"{character['id']}.png").is_file())
-        character = get_random_character()
-        embed, path = panels.character_embed(character)
-        self.assertEqual(embed.author.name, character['name'])
-        self.assertEqual(embed.description, emoji.emojize(character['messages'], language='alias'))
+        media = Media('char', 'name', 'image.png', b'image')
+        embed = panels.character_embed('hello :moon:', media)
+        self.assertEqual(embed.author.name, media.name)
+        self.assertEqual(embed.description, emoji.emojize('hello :moon:', language='alias'))
         self.assertEqual(embed.author.icon_url, embed.thumbnail.url)
-        self.assertEqual(embed.thumbnail.url, f'attachment://{path.name}')
+        self.assertEqual(embed.thumbnail.url, 'attachment://image.png')
+
+    async def test_asset_edit_updates_current_panel_without_period_reset(self):
+        await panels.ensure_panels(Mock())
+        reference = self.settings.get('mining_panel_character')
+        self.catalog.change(reference['id'], 100, reference['revision'], name='changed')
+        self.message.edit.reset_mock()
+        await panels.ensure_panels(Mock(), force=False)
+        self.assertEqual(self.message.edit.call_args.kwargs['embed'].author.name, 'changed')
+        self.assertEqual(self.settings.get('mining_panel_period'), '2026-10-23T12:00:00+09:00')

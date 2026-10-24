@@ -6,6 +6,7 @@ import datetime
 from typing import List
 import config.config as config
 from domain.mining_period import JST
+from services.asset_catalog import AssetCatalog
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,10 @@ def create_backup() -> List[str]:
                 source.backup(destination)
             backup_files.append(backup_path)
 
+    catalog = AssetCatalog(config.ASSET_DATA_DIR)
+    if catalog.database.is_file():
+        backup_files.append(catalog.backup(backup_dir))
+
     return backup_files
 
 def cleanup_old_backups(days_to_keep: int = 10) -> None:
@@ -44,7 +49,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
 
     cutoff_date = datetime.datetime.now(JST) - datetime.timedelta(days=days_to_keep)
     for filename in os.listdir(backup_dir):
-        if not filename.startswith(os.path.basename(config.DB_WALLET) + "_"):
+        if not filename.startswith((os.path.basename(config.DB_WALLET) + "_", 'assets_')):
             continue
         file_path = os.path.join(backup_dir, filename)
         file_time = datetime.datetime.fromtimestamp(os.path.getctime(file_path), JST)
@@ -58,8 +63,7 @@ def cleanup_old_backups(days_to_keep: int = 10) -> None:
 def cleanup_excess_backups(max_files: int = 10) -> None:
     """各DBごとにバックアップファイルがmax_files個を超えていたら古いものから削除する"""
     backup_dir = config.BACKUP_DIR
-    for db_name in [os.path.basename(config.DB_WALLET)]:
-        prefix = db_name + "_"
+    for prefix in (os.path.basename(config.DB_WALLET) + '_', 'assets_'):
         db_backups = [f for f in os.listdir(backup_dir) if f.startswith(prefix)]
         if len(db_backups) > max_files:
             db_backups_sorted = sorted(db_backups)

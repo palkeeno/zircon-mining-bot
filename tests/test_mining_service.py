@@ -1,4 +1,5 @@
 import os
+from contextlib import nullcontext
 import sys
 import unittest
 from pathlib import Path
@@ -46,6 +47,8 @@ for env_name, env_value in ENV_DEFAULTS.items():
 from services import mining_service
 
 
+from services.asset_catalog import Media
+
 class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
     def test_country_member_uses_country_chat(self):
         self.assertEqual(
@@ -92,14 +95,14 @@ class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(mining_service.config, "get_excellent_chat", return_value=456),
-            patch.object(mining_service.discord, "File", return_value=file),
+            patch.object(mining_service, "media_file", return_value=nullcontext(file)),
             patch.object(mining_service, "excellent", return_value=embed),
         ):
             await mining_service.send_excellent_notification(
                 client,
                 user=object(),
                 country=None,
-                filename="Excellent2.png",
+                media=Media("result", "result", "Excellent2.png", b"picture"),
             )
 
         client.get_channel.assert_called_once_with(456)

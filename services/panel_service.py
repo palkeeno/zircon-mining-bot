@@ -1,40 +1,40 @@
 """Maintain Discord panels in place; rotate the host once per mining period."""
 import asyncio
-from contextlib import closing
-from pathlib import Path
 
 import discord
 import emoji
 
 import config.config as config
-from consts.characters import get_random_character
-from services.runtime import wallet_service
+from services.runtime import wallet_service, asset_catalog
+from services.asset_delivery import media_file
 from services.mining_service import get_channel
 from views.wallet_view import MiningView, WalletView
 
 panel_lock = asyncio.Lock()
 
 
-def character_embed(character):
-    filename = f"{character['id']}.png"
-    embed = discord.Embed(description=emoji.emojize(character['messages'], language='alias'))
-    embed.set_author(name=character['name'], icon_url=f"attachment://{filename}")
-    embed.set_thumbnail(url=f"attachment://{filename}")
-    return embed, Path(config.CWD) / 'assets_character' / filename
+def character_embed(text, media):
+    embed = discord.Embed(description=emoji.emojize(text, language='alias'))
+    embed.set_author(name=media.name, icon_url=f'attachment://{media.filename}')
+    embed.set_thumbnail(url=f'attachment://{media.filename}')
+    return embed
 
 
 async def ensure_panels(client, *, force=True):
     async with panel_lock:
         config.settings.load_settings()
         period = wallet_service.current_period()
-        changed = config.settings.get('mining_panel_period') != period
+        signature = asset_catalog.signature()
+        changed = (config.settings.get('mining_panel_period') != period
+                   or config.settings.get('mining_asset_signature') != signature)
         if not force and not changed and all(config.settings.get(k) for k in ('mining_message_id', 'wallet_message_id')):
             return
-        character = config.settings.get('mining_panel_character')
-        if not character or config.settings.get('mining_character_period') != period:
-            character = get_random_character(exclude_id=character['id'] if character else None)
-            # Persist the choice before HTTP so failed edits and restarts retry the same host.
-            config.settings.update({'mining_panel_character': character, 'mining_character_period': period})
+        previous = config.settings.get('mining_panel_character')
+        same_period = config.settings.get('mining_character_period') == period
+        character, text, media = asset_catalog.character(
+            previous if same_period else None,
+            exclude=previous.get('id') if previous and not same_period else None)
+        config.settings.update({'mining_panel_character': character, 'mining_character_period': period})
         channel = await get_channel(client, config.CHID_MINING)
         for key, view in (('mining_message_id', MiningView()), ('wallet_message_id', WalletView())):
             if key == 'wallet_message_id' and not force and config.settings.get(key):
@@ -47,8 +47,8 @@ async def ensure_panels(client, *, force=True):
                     pass
                 # Forbidden/network errors propagate; they never trigger duplicate posts.
             if key == 'mining_message_id':
-                embed, path = character_embed(character)
-                with closing(discord.File(path, filename=path.name)) as image:
+                embed = character_embed(text, media)
+                with media_file(media) as image:
                     if message:
                         await message.edit(content=None, embed=embed, attachments=[image], view=view)
                     else:
@@ -60,4 +60,4 @@ async def ensure_panels(client, *, force=True):
                 else:
                     message = await channel.send(content=text, view=view)
             config.settings.set(key, message.id)
-        config.settings.set('mining_panel_period', period)
+        config.settings.update({'mining_panel_period': period, 'mining_asset_signature': signature})

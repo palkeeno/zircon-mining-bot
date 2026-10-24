@@ -1,14 +1,18 @@
 import asyncio
 import random
-from pathlib import Path
+import logging
+import time
 import discord
 from utils.helpers import get_country, gacha, has_mining_role
-from services.runtime import wallet_service
+from services.runtime import wallet_service, asset_catalog
+from services.asset_delivery import media_file
 import config.config as config
 from config.role_manager import RoleProbabilityManager
 from consts import sysmsg as SysMsg
 from services.embeds import mining_performance, mining as mining_embed, excellent
 
+
+log = logging.getLogger(__name__)
 
 def get_excellent_channel_id(country):
     """Excellent通知先を返す。国未所属者は共通雑談チャンネルに送る。"""
@@ -25,15 +29,10 @@ async def get_channel(client, channel_id):
     return channel
 
 
-async def send_excellent_notification(client, user, country, filename):
-    """Excellent結果を国別、または国未所属者用の雑談チャンネルへ送る。"""
-    channel_id = get_excellent_channel_id(country)
-    channel = await get_channel(client, channel_id)
-    img_ex = discord.File(
-        fp=f"{config.CWD}/assets/{filename}",
-        filename=filename,
-    )
-    await channel.send(file=img_ex, embed=excellent(user, filename))
+async def send_excellent_notification(client, user, country, media):
+    channel = await get_channel(client, get_excellent_channel_id(country))
+    with media_file(media) as attachment:
+        await channel.send(file=attachment, embed=excellent(user, media.filename))
 
 
 async def send_mining_error(interaction):
@@ -70,13 +69,9 @@ async def mining_zircon(interaction: discord.Interaction, client):
         # 採掘結果がエクセレントかどうか判定
         isExcellent = result["id"] == 0
         await interaction.response.defer(thinking=True, ephemeral=True)
-        assets = Path(config.CWD) / "assets"
-        gifs = sorted(assets.glob("mining[0-9]*.gif"))
-        images = sorted(assets.glob(f"{result['msg']}[0-9]*.png"))
-        if not gifs or not images:
-            raise FileNotFoundError("採掘画像がありません。")
-        fn_gif = random.choice(gifs).name
-        fn_img = random.choice(images).name
+        animation = await asyncio.to_thread(asset_catalog.choose_media, 'mining')
+        image = await asyncio.to_thread(asset_catalog.choose_media, result['msg'].lower())
+        fn_gif, fn_img = animation.filename, image.filename
         try:
             total = wallet_service.claim(interaction.user.id, result["zirnum"], isExcellent, interaction.id)
             credited = True
@@ -84,29 +79,25 @@ async def mining_zircon(interaction: discord.Interaction, client):
             await interaction.followup.send(str(error), ephemeral=True)
             return
 
-        gif_mining = discord.File(
-            fp=f"{config.CWD}/assets/{fn_gif}",
-            filename=fn_gif
-        )
-        em1 = mining_performance(interaction.user, fn_gif)
-        mining_msg = await interaction.followup.send(embed=em1, file=gif_mining, ephemeral=True)
+        started = time.monotonic()
+        with media_file(animation) as attachment:
+            mining_msg = await interaction.followup.send(
+                embed=mining_performance(interaction.user, fn_gif), file=attachment, ephemeral=True)
+        log.info('Mining animation upload: %.3fs', time.monotonic() - started)
         await asyncio.sleep(3)
-
-        img_mresult = discord.File(
-            fp=f"{config.CWD}/assets/{fn_img}",
-            filename=fn_img,
-        )
-        em2 = mining_embed(result, interaction.user, total, fn_img)
-        await mining_msg.edit(embed=em2, attachments=[img_mresult])
+        started = time.monotonic()
+        with media_file(image) as attachment:
+            await mining_msg.edit(embed=mining_embed(result, interaction.user, total, fn_img), attachments=[attachment])
+        log.info('Mining result upload: %.3fs', time.monotonic() - started)
         # 採掘結果が「Excellent!!」の場合、各国雑談チャンネルに投稿する
         if isExcellent:
             try:
-                await send_excellent_notification(client, interaction.user, country, fn_img)
+                await send_excellent_notification(client, interaction.user, country, image)
             except Exception as error:
-                print(f"Excellent通知エラー: {error}")
+                log.exception('Excellent notification failed')
                 await interaction.followup.send("採掘・残高更新は完了しましたが、Excellent通知を送信できませんでした。", ephemeral=True)
     except Exception as e:
-        print(f"採掘処理エラー ({type(e).__name__}): {e}")
+        log.exception('Mining failed')
         if credited:
             await interaction.followup.send("採掘・残高更新は完了しています。画像表示に失敗したため、保有数ボタンで確認してください。", ephemeral=True)
         else:
