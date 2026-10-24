@@ -83,6 +83,7 @@ class GuildStartupTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(zrmine.config, 'GUILD_ID', 111), \
              patch.object(zrmine, 'create_backup'), \
              patch.object(zrmine.wallet, 'initialize'), \
+             patch.object(zrmine.asset_catalog, 'initialize'), \
              patch.object(zrmine.tree, 'copy_global_to') as copy, \
              patch.object(zrmine.tree, 'sync', new=AsyncMock()) as sync:
             await zrmine.MiningClient.setup_hook(client)

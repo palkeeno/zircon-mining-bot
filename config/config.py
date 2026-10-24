@@ -46,6 +46,7 @@ TREASURY_USER_IDS = {
 }
 GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 BACKUP_DIR = os.getenv("BACKUP_DIR", "backups")
+ASSET_DATA_DIR = os.getenv('ASSET_DATA_DIR', str(PROJECT_ROOT / 'asset-data'))
 
 
 def get_mining_role():

@@ -9,7 +9,7 @@ from discord.ext import tasks
 
 import config.config as config
 from models import wallet
-from services.runtime import wallet_service
+from services.runtime import wallet_service, asset_catalog
 from utils.backup import perform_backup, create_backup
 from services.access import require_guild
 from views.wallet_view import MiningView, WalletView
@@ -26,6 +26,7 @@ class MiningClient(discord.Client):
             raise RuntimeError("CHID_MINING is outside the configured GUILD_ID")
         create_backup()
         wallet.initialize()
+        asset_catalog.initialize(config.CWD)
         self.add_view(MiningView())
         self.add_view(WalletView())
         if config.GUILD_ID:
