@@ -5,11 +5,13 @@ import os
 import random
 import re
 import sqlite3
+import tempfile
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from zipfile import ZipFile, ZIP_DEFLATED
 
 from PIL import Image, UnidentifiedImageError
 
@@ -267,3 +269,24 @@ class AssetCatalog:
     def signature(self):
         with self.db() as db:
             return db.execute('SELECT COALESCE(MAX(id),0) FROM history').fetchone()[0]
+
+    def backup(self, directory):
+        """Hold a read snapshot while copying catalog and its referenced media."""
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        name = 'assets_' + datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f') + '.zip'
+        with tempfile.TemporaryDirectory(dir=directory) as temporary:
+            temporary = Path(temporary)
+            with self.db() as db:
+                keys = [r[0] for r in db.execute('SELECT file_key FROM assets')]
+                destination = sqlite3.connect(temporary / 'catalog.db')
+                try:
+                    db.backup(destination)
+                finally:
+                    destination.close()
+                with ZipFile(temporary / name, 'w', compression=ZIP_DEFLATED) as archive:
+                    archive.write(temporary / 'catalog.db', 'catalog.db')
+                    for key in keys:
+                        archive.write(self.root / 'media' / key, 'media/' + key)
+            os.replace(temporary / name, directory / name)
+        return str(directory / name)

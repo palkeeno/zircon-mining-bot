@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from zipfile import ZipFile
 
 from PIL import Image
 from consts.characters import CHARACTERS_LIST
@@ -102,3 +103,31 @@ class AssetTests(unittest.TestCase):
         self.assertEqual(self.catalog.preview(row['id']).data, picture((30, 30)))
         with self.assertRaises(ValueError):
             self.catalog.upload('great', 'wrong', 'y.png', picture(), 100, target=row['id'])
+
+    def test_backup_restores_catalog_media_and_hidden_records_together(self):
+        row = self.catalog.list('character')[0]
+        self.catalog.change(row['id'], 100, row['revision'], enabled=False)
+        filename = self.catalog.backup(self.root / 'backups')
+        restored = self.root / 'restored'
+        with ZipFile(filename) as archive:
+            archive.extractall(restored)
+        catalog = AssetCatalog(restored)
+        self.assertEqual(catalog.list('character'), self.catalog.list('character'))
+        self.assertEqual(catalog.preview(row['id']).data, self.catalog.preview(row['id']).data)
+
+    def test_line_visibility_stale_edit_and_last_character_guard(self):
+        character = self.catalog.list('character')[0]
+        line = self.catalog.lines(character['id'])[0]
+        self.catalog.edit_line(character['id'], 100, line_id=line['id'], revision=line['revision'], enabled=False)
+        with self.assertRaises(ValueError):
+            self.catalog.edit_line(character['id'], 100, line_id=line['id'], revision=line['revision'], delete=True)
+        reference, _, _ = self.catalog.character({'id':character['id'], 'line_id':line['id']})
+        self.assertNotEqual(reference['line_id'], line['id'])
+        # Keep just one active character and one line; the final line cannot be removed.
+        with self.catalog.db(True) as db:
+            db.execute('UPDATE assets SET enabled=0 WHERE kind=?', ('character',))
+            db.execute('UPDATE assets SET enabled=1 WHERE id=?', (character['id'],))
+            db.execute('UPDATE lines SET enabled=0 WHERE character_id=?', (character['id'],))
+            db.execute('UPDATE lines SET enabled=1 WHERE id=?', (line['id'],))
+        with self.assertRaises(ValueError):
+            self.catalog.edit_line(character['id'], 100, line_id=line['id'], revision=line['revision']+1, delete=True)

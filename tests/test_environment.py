@@ -57,6 +57,7 @@ class EnvironmentTests(unittest.TestCase):
                 connection.execute('CREATE TABLE evidence(value INTEGER)')
                 connection.execute('INSERT INTO evidence VALUES(42)')
             with patch.object(backup.config, 'DB_WALLET', str(database)), \
+                 patch.object(backup.config, 'ASSET_DATA_DIR', str(root / 'absent-assets')), \
                  patch.object(backup.config, 'BACKUP_DIR', str(root / 'backups')):
                 files = backup.perform_backup()
             self.assertEqual(len(files), 1)
