@@ -15,7 +15,7 @@ def interaction(admin=False):
         id=12345, guild=SimpleNamespace(id=789, get_member=Mock(return_value=None)),
         client=SimpleNamespace(mining_guild_id=789),
         user=SimpleNamespace(id=100, roles=[], guild_permissions=SimpleNamespace(administrator=admin)),
-        response=SimpleNamespace(send_message=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock(), is_done=Mock(return_value=False)),
+        response=SimpleNamespace(send_message=AsyncMock(), send_modal=AsyncMock(), edit_message=AsyncMock(), defer=AsyncMock(), is_done=Mock(return_value=False)),
         followup=SimpleNamespace(send=AsyncMock()),
     )
 

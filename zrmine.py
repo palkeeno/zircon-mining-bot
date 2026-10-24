@@ -5,6 +5,7 @@ import os
 import discord
 from discord import app_commands
 from commands.wallet_commands import register_commands
+from commands.asset_commands import register_asset_commands
 from discord.ext import tasks
 
 import config.config as config
@@ -49,6 +50,7 @@ tree = MiningTree(client)
 
 
 register_commands(tree, wallet_service)
+register_asset_commands(tree, asset_catalog)
 
 @client.event
 async def on_ready():
