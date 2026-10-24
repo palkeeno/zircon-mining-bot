@@ -115,6 +115,17 @@ class AssetTests(unittest.TestCase):
         self.assertEqual(catalog.list('character'), self.catalog.list('character'))
         self.assertEqual(catalog.preview(row['id']).data, self.catalog.preview(row['id']).data)
 
+    def test_locked_obsolete_media_does_not_report_committed_delete_as_failure(self):
+        asset, _ = self.catalog.upload('good', 'extra', 'x.png', picture(), 100)
+        snapshot = self.catalog.preview(asset)
+        with patch.object(Path, 'unlink', side_effect=PermissionError('locked')):
+            with self.assertLogs('services.asset_catalog', level='WARNING'):
+                self.catalog.change(asset, 100, 1, delete=True)
+        with self.assertRaises(ValueError):
+            self.catalog.preview(asset)
+        with ZipFile(self.catalog.backup(self.root / 'backups')) as archive:
+            self.assertNotIn('media/' + snapshot.filename, archive.namelist())
+
     def test_line_visibility_stale_edit_and_last_character_guard(self):
         character = self.catalog.list('character')[0]
         line = self.catalog.lines(character['id'])[0]

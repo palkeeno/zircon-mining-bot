@@ -1,6 +1,7 @@
 """Persistent asset catalog and immutable media files, independent of wallets."""
 import io
 import json
+import logging
 import os
 import random
 import re
@@ -19,6 +20,7 @@ KINDS = {'character': 'キャラクター', 'mining': '採掘演出', 'excellent
          'great': 'Great結果', 'good': 'Good結果'}
 MAX_BYTES = 1_000_000
 RECOMMENDED_BYTES = 500_000
+log = logging.getLogger(__name__)
 
 
 def validate_image(data):
@@ -121,9 +123,20 @@ class AssetCatalog:
             suffix = '.img'
         key = uuid.uuid4().hex + suffix
         temporary = self.root / 'media' / (key + '.tmp')
-        temporary.write_bytes(data)
-        os.replace(temporary, self.root / 'media' / key)
+        try:
+            temporary.write_bytes(data)
+            os.replace(temporary, self.root / 'media' / key)
+        finally:
+            self._discard(temporary)
         return key
+
+    @staticmethod
+    def _discard(path):
+        # A locked obsolete file must not turn a committed mutation into a reported failure.
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            log.warning('Could not remove unreferenced asset file: %s', path, exc_info=True)
 
     @staticmethod
     def _audit(db, actor, action, target):
@@ -166,10 +179,10 @@ class AssetCatalog:
                                    (uuid.uuid4().hex, asset_id, dialogue.strip()))
                 self._audit(db, actor, 'replace' if target else 'create', asset_id)
         except Exception:
-            (self.root / 'media' / key).unlink(missing_ok=True)
+            self._discard(self.root / 'media' / key)
             raise
         if old_key:
-            (self.root / 'media' / old_key).unlink(missing_ok=True)
+            self._discard(self.root / 'media' / old_key)
         return asset_id, warning
 
     @staticmethod
@@ -212,7 +225,7 @@ class AssetCatalog:
             self._ready(db)
             self._audit(db, actor, 'delete' if delete else 'rename' if name is not None else 'visibility', asset_id)
         if key:
-            (self.root / 'media' / key).unlink(missing_ok=True)
+            self._discard(self.root / 'media' / key)
 
     def edit_line(self, character, actor, *, text=None, line_id=None, revision=None, enabled=None, delete=False):
         with self.db(True) as db:
