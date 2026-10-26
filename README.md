@@ -23,6 +23,7 @@ Discordで常設の採掘ボタンを押し、個人のログインポイント�
 | `/transfer source target amount` | Administrator | 任意のユーザー間で転送 |
 | `/resetmining` | Administrator | 全員の採掘回数を即時リセット（残高・実績は維持） |
 | `/exportwallet` | Administrator | 必要な情報を複数選択してCSVで取得 |
+| `/wipewallet` | Administrator | 全員のウォレットを初期化（確認2回・事前バックアップ必須） |
 | `/donate amount` | 一般ユーザー | 自分の所属国の国庫へ自動で寄付 |
 
 管理チャンネルにいるだけでは管理操作できません。設定ビュー・選択メニュー・入力フォームでも権限を再確認します。すべての操作は採掘チャンネルが属するサーバーに限定します。
