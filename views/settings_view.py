@@ -26,12 +26,17 @@ def summary():
         + (f"<@{config.get_treasury_user_id(c['id'])}>" if config.get_treasury_user_id(c['id']) else "未設定（暫定値0）")
         for c in config.COUNTRIES
     )
+    excellent_chats = '\n'.join(
+        f"{c['name']}のExcellent通知先：<#{config.get_country_excellent_chat(c['id'])}>"
+        for c in config.COUNTRIES
+    )
     return (
         f"**採掘Bot設定**\n営業：{'OPEN' if config.get_mine_open() else 'CLOSE'}\n"
         f"リセット（日本時間）：{', '.join(times[:24])}{' …' if len(times) > 24 else ''}（1日{len(times)}回）\n"
         f"各期間の採掘回数：{s.get('mining_limit', 1)}\n"
         f"採掘ロール：<@&{config.get_mining_role()}>\n"
         f"{treasuries}\n"
+        f"{excellent_chats}\n"
         f"未所属Excellent通知先：<#{config.get_excellent_chat()}>\n"
         f"採掘・ランキング投稿先：<#{config.CHID_MINING}>"
     )
@@ -167,13 +172,46 @@ class TargetView(SafeView):
 
     @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="未所属者のExcellent通知先", min_values=1, max_values=1)
     async def excellent_channel(self, interaction, select):
-        channel = interaction.guild.get_channel(select.values[0].id)
-        permissions = channel.permissions_for(interaction.guild.me) if channel else None
-        if not permissions or not all((permissions.view_channel, permissions.send_messages, permissions.attach_files, permissions.embed_links)):
-            await interaction.response.send_message("Botが閲覧・投稿・画像添付・埋め込みできるチャンネルを選んでください。", ephemeral=True)
+        channel = await excellent_target(interaction, select.values[0].id)
+        if channel is None:
             return
         config.settings.set("excellent_chat", channel.id)
         await interaction.response.send_message(summary(), ephemeral=True)
+
+
+async def excellent_target(interaction, channel_id):
+    channel = interaction.guild.get_channel(channel_id)
+    permissions = channel.permissions_for(interaction.guild.me) if channel else None
+    if (not isinstance(channel, discord.TextChannel) or channel.guild.id != interaction.guild.id
+            or not permissions or not all((permissions.view_channel, permissions.send_messages,
+                                           permissions.attach_files, permissions.embed_links))):
+        await interaction.response.send_message("Botが閲覧・投稿・画像添付・埋め込みできるチャンネルを選んでください。", ephemeral=True)
+        return None
+    return channel
+
+
+class CountryExcellentSelect(discord.ui.ChannelSelect):
+    def __init__(self, country):
+        super().__init__(placeholder=f"{country['name']}のExcellent通知先",
+                         channel_types=[discord.ChannelType.text], min_values=1, max_values=1)
+        self.country_id = country['id']
+
+    async def callback(self, interaction):
+        channel = await excellent_target(interaction, self.values[0].id)
+        if channel is None:
+            return
+        config.set_country_excellent_chat(self.country_id, channel.id)
+        await interaction.response.edit_message(content=summary(), view=CountryExcellentView())
+
+
+class CountryExcellentView(SafeView):
+    def __init__(self):
+        super().__init__(timeout=180)
+        for country in config.COUNTRIES:
+            self.add_item(CountryExcellentSelect(country))
+
+    async def interaction_check(self, interaction):
+        return await require_admin(interaction)
 
 
 class SettingsView(SafeView):
@@ -226,3 +264,7 @@ class SettingsView(SafeView):
     @discord.ui.button(label="現在の設定を更新表示", row=1)
     async def refresh(self, interaction, button):
         await interaction.response.edit_message(content=summary(), view=self)
+
+    @discord.ui.button(label="国別Excellent通知先", row=1)
+    async def country_excellent(self, interaction, button):
+        await interaction.response.send_message(summary(), view=CountryExcellentView(), ephemeral=True)
