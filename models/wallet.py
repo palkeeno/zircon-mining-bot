@@ -1,7 +1,10 @@
 """Personal balances, mining claims and audit entries share one SQLite transaction."""
 import sqlite3
+import os
+import tempfile
 from contextlib import contextmanager, closing
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import config.config as config
 from domain.mining_period import JST, scheduled_period
@@ -32,6 +35,35 @@ def transaction():
 def initialize():
     with transaction() as db:
         initialize_schema(db)
+
+
+def wipe(*, actor, request_id):
+    """Back up a stable committed snapshot, then clear wallet data atomically."""
+    if type(actor) is not int or actor <= 0 or type(request_id) is not int or request_id <= 0:
+        raise ValueError('実行者・操作IDが不正です。')
+    with transaction() as db:
+        if config.get_mine_open():
+            raise ValueError('先に /settings で採掘をCLOSEにしてください。')
+        initialize_schema(db)
+        users = db.execute('SELECT COUNT(*) FROM wallets').fetchone()[0]
+        directory = Path(config.BACKUP_DIR)
+        directory.mkdir(parents=True, exist_ok=True)
+        name = f"wallet-wipe-{datetime.now(JST).strftime('%Y%m%d_%H%M%S_%f')}-{request_id}.db"
+        backup = directory / name
+        # BEGIN IMMEDIATE excludes all competing writers. Use a separate read connection
+        # for backup: backing up the connection with an open write transaction can hang.
+        with tempfile.TemporaryDirectory(prefix='.wallet-wipe-', dir=directory) as temporary:
+            snapshot = Path(temporary) / 'wallet.db'
+            with closing(sqlite3.connect(config.DB_WALLET)) as source, closing(sqlite3.connect(snapshot)) as target:
+                source.backup(target)
+                if target.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                    raise RuntimeError('初期化前バックアップの整合性を確認できません。')
+            snapshot.chmod(0o600)
+            os.replace(snapshot, backup)
+        for table in ('wallet_ledger', 'mining_claims', 'mining_resets', 'wallets'):
+            db.execute(f'DELETE FROM {table}')
+        db.execute('UPDATE mining_state SET manual_period=NULL WHERE id=1')
+    return {'backup': str(backup), 'users': users}
 
 
 def ensure_user(db, uid):
