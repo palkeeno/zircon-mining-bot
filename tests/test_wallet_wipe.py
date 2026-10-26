@@ -88,6 +88,23 @@ class WipeDatabaseTests(unittest.TestCase):
         self.assertEqual(self.contents(), before)
         self.assertFalse((self.root / 'backups').exists())
 
+    def test_two_confirmations_reach_real_service_and_database(self):
+        async def execute():
+            i = interaction(True)
+            i.edit_original_response = AsyncMock()
+            session = WipeView(100, WalletService(wallet, config))
+            self.assertTrue(await session.interaction_check(i))
+            await session.proceed.callback(i)
+            self.assertEqual(wallet.balance(100)[0], 20)
+            modal = i.response.send_modal.call_args.args[0]
+            modal.confirmation._value = CONFIRMATION
+            self.assertTrue(await modal.interaction_check(i))
+            with self.assertLogs('services.wallet_service', level='WARNING'):
+                await modal.on_submit(i)
+            self.assertEqual(wallet.balance(100), (0, 0, 0))
+            self.assertIn('初期化しました', i.edit_original_response.call_args.kwargs['content'])
+        asyncio.run(execute())
+
 
 class WipeViewTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
