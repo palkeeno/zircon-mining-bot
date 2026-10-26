@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 def get_excellent_channel_id(country):
     """Excellent通知先を返す。国未所属者は共通雑談チャンネルに送る。"""
-    return country["chid"] if country is not None else config.get_excellent_chat()
+    return config.get_country_excellent_chat(country['id']) if country is not None else config.get_excellent_chat()
 
 
 async def get_channel(client, channel_id):

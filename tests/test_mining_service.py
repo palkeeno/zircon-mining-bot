@@ -51,10 +51,9 @@ from services.asset_catalog import Media
 
 class ExcellentChannelTests(unittest.IsolatedAsyncioTestCase):
     def test_country_member_uses_country_chat(self):
-        self.assertEqual(
-            123,
-            mining_service.get_excellent_channel_id({"chid": 123}),
-        )
+        with patch.object(mining_service.config, 'get_country_excellent_chat', return_value=123) as target:
+            self.assertEqual(123, mining_service.get_excellent_channel_id({'id': 1, 'chid': 999}))
+            target.assert_called_once_with(1)
 
     def test_unaffiliated_member_uses_common_chat(self):
         with patch.object(mining_service.config, "get_excellent_chat", return_value=456):

@@ -74,6 +74,23 @@ def set_treasury_user_id(country_id, user_id):
 def get_excellent_chat():
     return int(settings.get("excellent_chat", MINING_EXCELLENT_CHAT))
 
+
+def get_country_excellent_chat(country_id):
+    country = next((c for c in COUNTRIES if str(c['id']) == str(country_id)), None)
+    if country is None:
+        raise ValueError("国を選択してください。")
+    return int(settings.get('country_excellent_chats', {}).get(str(country['id']), country['chid']))
+
+
+def set_country_excellent_chat(country_id, channel_id):
+    settings.load_settings()
+    get_country_excellent_chat(country_id)  # Reject unknown countries before saving.
+    if channel_id <= 0:
+        raise ValueError("投稿先チャンネルを選択してください。")
+    values = dict(settings.get('country_excellent_chats', {}))
+    values[str(country_id)] = channel_id
+    settings.set('country_excellent_chats', values)
+
 # Emojis
 BRAVE_EMOJI = os.getenv("BRAVE_EMOJI")
 FREEDOM_EMOJI = os.getenv("FREEDOM_EMOJI")
