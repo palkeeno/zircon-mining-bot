@@ -8,6 +8,7 @@ from discord import app_commands
 from services.panel_service import ensure_panels
 from views.settings_view import SettingsView, summary
 from views.export_view import ExportView
+from views.wipe_view import WipeView
 
 log = logging.getLogger(__name__)
 
@@ -106,6 +107,14 @@ def register_commands(tree, service):
             'ダウンロードする情報を選択し、「選択した情報をダウンロード」を押してください。\n'
             '選択画面は3分間利用できます。',
             view=ExportView(interaction.user.id, service), ephemeral=True)
+
+    @tree.command(name='wipewallet', description='全員の残高・実績・履歴を初期化します（確認2回・バックアップ付き）')
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @administrator()
+    async def wipewallet(interaction: discord.Interaction):
+        view = WipeView(interaction.user.id, service)
+        await interaction.response.send_message(view.warning(), view=view, ephemeral=True)
 
     @tree.error
     async def command_error(interaction, error):
