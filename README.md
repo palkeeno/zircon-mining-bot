@@ -51,7 +51,7 @@ python -m pip install -r requirements.txt
 - `MINING_ROLE`：採掘可能ロールの初期値
 - `MINING_EXCELLENT_CHAT`：未所属者のExcellent通知先初期値
 - `BRAVE_TREASURY_USER_ID` / `FREEDOM_TREASURY_USER_ID` / `GLORY_TREASURY_USER_ID` / `PEACEFUL_TREASURY_USER_ID`：各国の国庫アカウント初期値。省略時は暫定値 `0`（その国への寄付を無効化）
-- 各国の `*_ROLE` / `*_CHAT` / `*_EMOJI`：所属判定・国別Excellent通知・所属表示
+- 各国の `*_ROLE` / `*_CHAT` / `*_EMOJI`：所属判定・国別Excellent通知の初期値・所属表示。通知先は `/settings` →「国別Excellent通知先」で変更でき、保存値を優先
 - `DB_WALLET`：個人残高・採掘権・操作履歴をまとめた新規SQLite DB。省略時はプロジェクト直下の `wallet.db`。旧 `DB_USERS` / `DB_MINING` は使用しません。
 - `ASSET_DATA_DIR`：アセットDBと画像の永続保存先。省略時はプロジェクト直下の `asset-data`。テストと本番で別ディレクトリを指定してください。
 - `CWD`：既存のアプリ配置先
