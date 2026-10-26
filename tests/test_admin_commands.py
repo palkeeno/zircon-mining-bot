@@ -18,12 +18,20 @@ class AdminCommandTests(unittest.IsolatedAsyncioTestCase):
         register_commands(self.tree, self.service)
 
     async def test_new_commands_have_runtime_admin_checks_and_default_permissions(self):
-        for name in ('resetmining', 'exportwallet'):
+        for name in ('resetmining', 'exportwallet', 'wipewallet'):
             command = self.tree.get_command(name)
             self.assertTrue(command.default_permissions.administrator)
             self.assertTrue(command.guild_only)
             self.assertFalse(await command.checks[0](interaction(False)))
             self.assertTrue(await command.checks[0](interaction(True)))
+
+    async def test_wipe_command_only_opens_private_first_confirmation(self):
+        from views.wipe_view import WipeView
+        i = interaction(True)
+        await self.tree.get_command('wipewallet').callback(i)
+        self.assertIsInstance(i.response.send_message.call_args.kwargs['view'], WipeView)
+        self.assertTrue(i.response.send_message.call_args.kwargs['ephemeral'])
+        self.service.wipe.assert_not_called()
 
     async def test_reset_refreshes_panel_and_reports_partial_failure_without_reset_retry(self):
         i = interaction(True)

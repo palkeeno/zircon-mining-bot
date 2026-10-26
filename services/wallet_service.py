@@ -1,5 +1,6 @@
 """Application operations shared by commands, buttons and scheduled work."""
 from dataclasses import dataclass
+import logging
 
 from services.wallet_export import export_wallet, package_exports
 
@@ -33,6 +34,12 @@ class WalletService:
 
     def reset(self, *, actor, request_id):
         return self.repository.reset_claims(actor=actor, request_id=request_id)
+
+    def wipe(self, *, actor, request_id):
+        receipt = self.repository.wipe(actor=actor, request_id=request_id)
+        logging.getLogger(__name__).warning('Wallet wiped: actor=%s request=%s users=%s backup=%s',
+                                           actor, request_id, receipt['users'], receipt['backup'])
+        return receipt
 
     def export(self, limit, tables):
         return package_exports(export_wallet(self.configuration.DB_WALLET, tables), limit)
