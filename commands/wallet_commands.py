@@ -9,6 +9,7 @@ from services.panel_service import ensure_panels
 from views.settings_view import SettingsView, summary
 from views.export_view import ExportView
 from views.wipe_view import WipeView
+from views.help_view import help_embed
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +19,14 @@ def register_commands(tree, service):
         async def predicate(interaction):
             return bool(interaction.guild and interaction.user.guild_permissions.administrator)
         return app_commands.check(predicate)
+
+    @tree.command(name='help', description='管理者向けコマンドの使い方を表示します')
+    @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @administrator()
+    async def help_command(interaction: discord.Interaction):
+        await interaction.response.send_message(
+            embed=help_embed(), ephemeral=True)
 
 
     @tree.command(name="settings", description="採掘Botの設定を確認・変更します")

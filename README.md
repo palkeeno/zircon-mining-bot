@@ -17,6 +17,7 @@ Discordで常設の採掘ボタンを押し、個人のログインポイント�
 
 | コマンド | 権限 | 用途 |
 | --- | --- | --- |
+| `/help` | Administrator | 本人限定の管理コマンドの使い方案内 |
 | `/settings` | Administrator | 設定ビューを開く |
 | `/add user amount` | Administrator | 残高を付与 |
 | `/remove user amount` | Administrator | 残高を引き去る |
