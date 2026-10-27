@@ -20,11 +20,13 @@ def register_commands(tree, service):
             return bool(interaction.guild and interaction.user.guild_permissions.administrator)
         return app_commands.check(predicate)
 
-    @tree.command(name='help', description='採掘Botの使い方とコマンド一覧を表示します')
+    @tree.command(name='help', description='管理者向けコマンドの使い方を表示します')
     @app_commands.guild_only()
+    @app_commands.default_permissions(administrator=True)
+    @administrator()
     async def help_command(interaction: discord.Interaction):
         await interaction.response.send_message(
-            embed=help_embed(administrator=interaction.user.guild_permissions.administrator), ephemeral=True)
+            embed=help_embed(), ephemeral=True)
 
 
     @tree.command(name="settings", description="採掘Botの設定を確認・変更します")
