@@ -141,6 +141,8 @@ class RoleProbabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.path.exists())
 
     async def test_pages_cover_more_than_select_limit_and_handle_duplicate_priorities(self):
+        self.save([self.row()])
+        self.assertIn('1 / 1 ページ', RoleProbabilityView(100).text())
         self.save([self.row('長い役職名_' * 10 + str(index), index // 2 + 1) for index in range(27)])
         choices = []
         for page in range(6):
@@ -148,6 +150,7 @@ class RoleProbabilityTests(unittest.IsolatedAsyncioTestCase):
             picker = next(item for item in view.children if isinstance(item, ProbabilitySelect))
             choices.extend(option.value for option in picker.options)
             self.assertLess(len(view.text()), 2000)
+            self.assertIn(f'{page + 1} / 6 ページ', view.text())
             self.assertTrue(all(len(option.label) <= 100 for option in picker.options))
         self.assertEqual(choices, [str(index) for index in range(27)])
 

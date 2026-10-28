@@ -32,7 +32,7 @@ class RoleProbabilityView(SafeView):
             lines.append(f"{row['priority']}. {name}：Excellent {row['excellent_prob']}% / Great {row['great_prob']}%")
         if not self.rows:
             lines.append('ロール別設定はありません。「追加」からロールを選んでください。')
-        lines.append(f'{self.page + 1} / {max(1, (len(self.rows) + 9) // 5)} ページ')
+        lines.append(f'{self.page + 1} / {max(1, (len(self.rows) + 4) // 5)} ページ')
         if self.editing and self.rows:
             lines.append('下のプルダウンで変更する優先順を選んでください。')
         return '\n'.join(lines)
