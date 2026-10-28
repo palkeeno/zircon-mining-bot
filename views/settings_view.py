@@ -2,7 +2,6 @@ import math
 import discord
 
 import config.config as config
-from config.role_manager import RoleProbabilityManager
 from views.wallet_view import SafeView
 from services.panel_service import ensure_panels
 from services.access import require_guild
@@ -105,33 +104,6 @@ class ProbabilityModal(AdminModal, title="採掘確率と獲得数"):
                 ("Excellent", "Great", "Good"), (ex / 100, (ex + gr) / 100, 1.0), amounts))
         ])
         await interaction.response.send_message("共通確率・獲得数を保存しました。", ephemeral=True)
-
-
-class RoleProbabilityModal(AdminModal, title="ロール別確率"):
-    role_id = discord.ui.TextInput(label="ロールID")
-    excellent = discord.ui.TextInput(label="Excellent確率（%、空欄で設定削除）", required=False)
-    great = discord.ui.TextInput(label="Great確率（%）", required=False)
-    priority = discord.ui.TextInput(label="優先順位（1以上、小さいほど優先）", default="1")
-
-    async def on_submit(self, interaction):
-        try:
-            role = interaction.guild.get_role(int(self.role_id.value))
-            if role is None:
-                raise ValueError
-            manager = RoleProbabilityManager()
-            if not self.excellent.value and not self.great.value:
-                manager.remove_role(role.name)
-            else:
-                ex, gr, priority = float(self.excellent.value), float(self.great.value), int(self.priority.value)
-                if not all(math.isfinite(v) for v in (ex, gr)) or min(ex, gr) < 0 or ex + gr > 100 or priority < 1:
-                    raise ValueError
-                manager.cache = [r for r in manager.cache if r["role_name"] != role.name]
-                manager.cache.append({"role_name": role.name, "excellent_prob": ex, "great_prob": gr, "priority": priority})
-            manager.save()
-        except ValueError:
-            await interaction.response.send_message("ロールID・確率・優先順位を確認してください。", ephemeral=True)
-            return
-        await interaction.response.send_message("ロール別確率を保存しました。", ephemeral=True)
 
 
 class TreasurySelect(discord.ui.UserSelect):
@@ -242,18 +214,11 @@ class SettingsView(SafeView):
     async def probability(self, interaction, button):
         await interaction.response.send_modal(ProbabilityModal())
 
-    @discord.ui.button(label="ロール別確率の変更", row=1)
+    @discord.ui.button(label="ロール別確率の設定", row=1)
     async def role_probability(self, interaction, button):
-        await interaction.response.send_modal(RoleProbabilityModal())
-
-    @discord.ui.button(label="ロール別確率の確認", row=1)
-    async def role_list(self, interaction, button):
-        rows = sorted(RoleProbabilityManager().cache, key=lambda r: r["priority"])
-        text = "\n".join(f"{r['priority']}. {r['role_name']}：Excellent {r['excellent_prob']}% / Great {r['great_prob']}%" for r in rows) or "ロール別設定はありません。"
-        # Split to respect Discord message limits.
-        await interaction.response.defer(ephemeral=True)
-        for start in range(0, len(text), 1900):
-            await interaction.followup.send(text[start:start + 1900], ephemeral=True)
+        from views.role_probability_view import RoleProbabilityView
+        view = RoleProbabilityView(interaction.user.id)
+        await interaction.response.send_message(view.text(), view=view, ephemeral=True)
 
     @discord.ui.button(label="常設投稿を確認・復旧", row=1)
     async def panels(self, interaction, button):
