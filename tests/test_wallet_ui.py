@@ -21,6 +21,23 @@ def interaction(admin=False):
 
 
 class UITests(unittest.IsolatedAsyncioTestCase):
+    async def test_admin_can_set_one_reset_mention_role_and_clear_it(self):
+        view = TargetView()
+        self.assertFalse(await view.interaction_check(interaction()))
+        i = interaction(True)
+        self.assertTrue(await view.interaction_check(i))
+        select = view.mining_reset_role
+        self.assertEqual(select.max_values, 1)
+        with patch.object(zrmine.config.settings, 'set') as save:
+            select._values = [SimpleNamespace(id=i.guild.id, is_default=Mock(return_value=True))]
+            await select.callback(i)
+            save.assert_not_called()
+            select._values = [SimpleNamespace(id=1234, is_default=Mock(return_value=False))]
+            await select.callback(i)
+            save.assert_called_once_with('mining_reset_mention_role', 1234)
+            await view.clear_mining_reset_role.callback(i)
+            save.assert_called_with('mining_reset_mention_role', None)
+
     async def test_both_ranking_buttons_respond_ephemerally(self):
         with patch("views.wallet_view.wallet_service.ranking", return_value=[]):
             for callback in (WalletView().balances, WalletView().excellents):

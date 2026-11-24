@@ -20,6 +20,8 @@ def summary():
     s = config.settings
     s.load_settings()
     times = [f"{h:02}:{m:02}" for h in config.get_announce_hour() for m in config.get_announce_minute()]
+    reset_role = s.get("mining_reset_mention_role")
+    reset_mention = f"<@&{reset_role}>" if reset_role else "なし"
     treasuries = "\n".join(
         f"{c['name']}（<@&{c['role']}>）の国庫："
         + (f"<@{config.get_treasury_user_id(c['id'])}>" if config.get_treasury_user_id(c['id']) else "未設定（暫定値0）")
@@ -34,6 +36,7 @@ def summary():
         f"リセット（日本時間）：{', '.join(times[:24])}{' …' if len(times) > 24 else ''}（1日{len(times)}回）\n"
         f"各期間の採掘回数：{s.get('mining_limit', 1)}\n"
         f"採掘ロール：<@&{config.get_mining_role()}>\n"
+        f"採掘権リセット時のメンション：{reset_mention}\n"
         f"{treasuries}\n"
         f"{excellent_chats}\n"
         f"未所属Excellent通知先：<#{config.get_excellent_chat()}>\n"
@@ -141,6 +144,20 @@ class TargetView(SafeView):
     async def mining_role(self, interaction, select):
         config.settings.set("mining_role", select.values[0].id)
         await interaction.response.send_message(summary(), ephemeral=True)
+
+    @discord.ui.select(cls=discord.ui.RoleSelect, placeholder="採掘権リセット時にメンションするロール")
+    async def mining_reset_role(self, interaction, select):
+        role = select.values[0]
+        if role.is_default():
+            await interaction.response.send_message("個別のロールを選択してください。", ephemeral=True)
+            return
+        config.settings.set("mining_reset_mention_role", role.id)
+        await interaction.response.edit_message(content=summary(), view=self)
+
+    @discord.ui.button(label="リセット時のメンションを解除", row=3)
+    async def clear_mining_reset_role(self, interaction, button):
+        config.settings.set("mining_reset_mention_role", None)
+        await interaction.response.edit_message(content=summary(), view=self)
 
     @discord.ui.select(cls=discord.ui.ChannelSelect, channel_types=[discord.ChannelType.text], placeholder="未所属者のExcellent通知先", min_values=1, max_values=1)
     async def excellent_channel(self, interaction, select):
